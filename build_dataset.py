@@ -112,6 +112,7 @@ class SyntheticDatasetBuilder:
                  mode='lines', style='normal', verbose=False,
                  train_split=0.8, val_split=0.1, num_workers=1, max_fonts_per_category=None,
                  category_filter=None):
+        ##CANVI A FER: Caldria afegir que es borri l'actual carpeta output?? 
         self.data_dir = Path(data_dir)
         self.fonts_dir = Path(fonts_dir)
         self.output_dir = Path(output_dir)
@@ -300,7 +301,9 @@ class SyntheticDatasetBuilder:
                         # Crear líneas de 5 palabras
                         for i in range(0, len(words), 5):
                             chunk = words[i:i+5]
-                            if chunk:  # Solo agregar si hay palabras
+                            #if chunk:  # Solo agregar si hay palabras
+                            text = ' '.join(chunk)  #CANVI
+                            if len(text) >= 3 and any(c.isalpha() for c in text): #CANVI
                                 self.texts.append({
                                     'text': ' '.join(chunk),
                                     'book': book_dir.name,

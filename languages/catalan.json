@@ -1,0 +1,8 @@
+{
+    "language": "catalan",
+    "code": "ca",
+    "required_chars": ["à", "è", "é", "í", "ï", "ò", "ó", "ú", "ü", "ç", "·"],
+    "wikipedia_url": "https://ca.wikipedia.org",
+    "wikisource_url": "https://ca.wikisource.org",
+    "sample_text": "El vent satisfà la gent del poble"
+}

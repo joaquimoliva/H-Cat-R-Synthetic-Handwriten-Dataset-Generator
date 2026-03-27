@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-DaFont Scraper for Catalan-Compatible Fonts
+DaFont Scraper for Language-Compatible Fonts
 Finds fonts that support Catalan special characters, particularly l·l
 """
 
@@ -13,18 +13,37 @@ import argparse
 import io
 import zipfile
 from fontTools.ttLib import TTFont
+from pathlib import Path
 
 class DaFontScraper:
-    def __init__(self, use_accent_filter=True, verbose=False):
+    def __init__(self, language='catalan', use_accent_filter=True, verbose=False):
         self.base_url = "https://www.dafont.com"
         self.headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
         }
-        self.catalan_chars = ['à', 'è', 'é', 'í', 'ï', 'ò', 'ó', 'ú', 'ü', 'ç', '·']
-        self.use_accent_filter = use_accent_filter
+        self.language = language
+        self.lang_config = self._load_language_config(language)
+        self.required_chars = self.lang_config.get('required_chars', [])
+        self.use_accent_filter = use_accent_filter and len(self.required_chars) > 0
         self.verbose = verbose
-        # DaFont filter parameters
-        self.filter_params = "&a=on" if use_accent_filter else ""
+        self.filter_params = "&a=on" if self.use_accent_filter else ""
+        self.font_blacklist = [
+            'Loveletter_No._9',
+            'Loveletter No. 9',
+            'Autograf',
+        ]
+
+    def _load_language_config(self, language):
+        """Carrega la configuració de l'idioma des de languages/"""
+        import json
+        config_path = Path(__file__).parent / 'languages' / f'{language}.json'
+        if config_path.exists():
+            with open(config_path, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        else:
+            print(f"[WARNING] No language config found: {config_path}")
+            print(f"  Available: {', '.join(p.stem for p in (Path(__file__).parent / 'languages').glob('*.json'))}")
+            return {'required_chars': []}
 
     def get_page(self, url):
         """Fetch a page with error handling"""
@@ -111,6 +130,11 @@ class DaFontScraper:
                 font_link = font_div.find('a', href=True)
                 if font_link:
                     font_name = font_link.get_text(strip=True)
+                    # Skip blacklisted fonts
+                    if any(bl.lower() in font_name.lower() for bl in self.font_blacklist):
+                        if self.verbose:
+                            print(f"  [SKIP] Blacklisted font: {font_name}")
+                        continue
                     font_url = urljoin(self.base_url, font_link['href'])
 
                     # Get font details page
@@ -133,7 +157,7 @@ class DaFontScraper:
 
         soup = BeautifulSoup(html, 'html.parser')
         info = {
-            'supports_catalan': False,
+            'supports_language': False,
             'download_url': None
         }
 
@@ -145,8 +169,8 @@ class DaFontScraper:
 
         # Check font file for Catalan support by downloading and inspecting it
         if info['download_url']:
-            catalan_support = self.check_character_support(info['download_url'])
-            info['supports_catalan'] = catalan_support
+            language_support = self.check_character_support(info['download_url'])
+            info['supports_language'] = language_support
 
         return info
 
@@ -218,29 +242,20 @@ class DaFontScraper:
                 print(f"      [X] Failed to load font: {e}")
             return False
 
-        # Check for Catalan-specific characters, numbers, and punctuation
-        catalan_chars = {
-            0x00B7: ('middle dot', '·'),
-            0x00E7: ('c with cedilla', 'ç'),
-            0x0030: ('0 (zero)', '0'),
-            0x0031: ('1 (one)', '1'),
-            0x0032: ('2 (two)', '2'),
-            0x0033: ('3 (three)', '3'),
-            0x0034: ('4 (four)', '4'),
-            0x0035: ('5 (five)', '5'),
-            0x0036: ('6 (six)', '6'),
-            0x0037: ('7 (seven)', '7'),
-            0x0038: ('8 (eight)', '8'),
-            0x0039: ('9 (nine)', '9'),
-            0x002D: ('hyphen-minus', '-'),
-            0x003C: ('less than', '<'),
-            0x003E: ('greater than', '>'),
-            0x0028: ('left parenthesis', '('),
-            0x0029: ('right parenthesis', ')'),
+        # Check for language-specific characters, numbers, and punctuation
+        required_chars = {
+            0x0030: ('0', '0'), 0x0031: ('1', '1'), 0x0032: ('2', '2'),
+            0x0033: ('3', '3'), 0x0034: ('4', '4'), 0x0035: ('5', '5'),
+            0x0036: ('6', '6'), 0x0037: ('7', '7'), 0x0038: ('8', '8'),
+            0x0039: ('9', '9'), 0x002D: ('hyphen', '-'),
+            0x0028: ('left paren', '('), 0x0029: ('right paren', ')'),
         }
+        # Add language-specific characters
+        for char in self.required_chars:
+            required_chars[ord(char)] = (f'lang: {char}', char)
 
         results = {}
-        for codepoint, (name, char) in catalan_chars.items():
+        for codepoint, (name, char) in required_chars.items():
             if codepoint in cmap:
                 glyph_name = cmap[codepoint]
                 results[codepoint] = True
@@ -251,14 +266,14 @@ class DaFontScraper:
                 if self.verbose:
                     print(f"      [X] Missing {char} (U+{codepoint:04X}) - {name}")
 
-        # STRICT REQUIREMENT: ALL required characters must be present (Catalan chars + numbers + punctuation)
+        # STRICT REQUIREMENT: ALL required characters must be present (language-specific chars + numbers + punctuation)
         if all(results.values()):
             if self.verbose:
-                print(f"      [ACCEPT] Font has all required characters (Catalan chars + numbers + punctuation)")
+                print(f"      [ACCEPT] Font has all required characters (language-specific chars + numbers + punctuation)")
             return True
         else:
             if self.verbose:
-                missing = [f"{char}" for cp, (name, char) in catalan_chars.items() if not results.get(cp)]
+                missing = [f"{char}" for cp, (name, char) in required_chars.items() if not results.get(cp)]
                 print(f"      [REJECT] Font missing: {', '.join(missing)}")
             return False
 
@@ -287,26 +302,28 @@ class DaFontScraper:
 
         return compatible_fonts
 
-    def save_results(self, fonts, filename='catalan_fonts.csv'):
+    def save_results(self, fonts, filename='compatible_fonts.csv'):
         """Save results to CSV"""
         if not fonts:
             print("No fonts to save")
             return
 
         with open(filename, 'w', newline='', encoding='utf-8') as f:
-            writer = csv.DictWriter(f, fieldnames=['name', 'category', 'url', 'supports_catalan', 'download_url'])
+            writer = csv.DictWriter(f, fieldnames=['name', 'category', 'url', 'supports_language', 'download_url'])
             writer.writeheader()
             writer.writerows(fonts)
 
         print(f"\n[OK] Results saved to {filename}")
 
 def main():
-    parser = argparse.ArgumentParser(description='Scrape DaFont for Catalan-compatible fonts')
+    parser = argparse.ArgumentParser(description='Scrape DaFont for language-compatible fonts')
+    parser.add_argument('--language', default='catalan',
+                        help='Idioma per filtrar fonts (default: catalan). Opcionas: catalan, spanish, basque, galician, french, english')
     parser.add_argument('--categories', type=int, default=3, help='Number of categories to scrape')
     parser.add_argument('--category-filter', type=str, default=None,
                         help='Filter by category name(s), comma-separated (e.g., "Handwritten,Script,Brush")')
     parser.add_argument('--pages', type=int, default=2, help='Number of pages per category')
-    parser.add_argument('--output', default='catalan_fonts.csv', help='Output CSV file')
+    parser.add_argument('--output', default='compatible_fonts.csv', help='Output CSV file')
     parser.add_argument('--no-accent-filter', action='store_true',
                         help='Disable DaFont accent filter (include all fonts)')
     parser.add_argument('--verbose', '-v', action='store_true',
@@ -314,9 +331,13 @@ def main():
 
     args = parser.parse_args()
 
-    scraper = DaFontScraper(use_accent_filter=not args.no_accent_filter, verbose=args.verbose)
+    scraper = DaFontScraper(
+        language=args.language,
+        use_accent_filter=not args.no_accent_filter,
+        verbose=args.verbose
+    )
 
-    print("Starting DaFont scraper for Catalan fonts...")
+    print(f"Starting DaFont scraper for {args.language} fonts...")
     print("=" * 60)
     if scraper.use_accent_filter:
         print("[OK] Using DaFont's accent filter (&a=on)")
@@ -353,9 +374,9 @@ def main():
         all_fonts.extend(fonts)
 
         # Filter for Catalan support
-        catalan_in_category = [f for f in fonts if f.get('supports_catalan')]
+        catalan_in_category = [f for f in fonts if f.get('supports_language')]
         catalan_fonts.extend(catalan_in_category)
-        print(f"  [OK] Found {len(catalan_in_category)} Catalan-compatible fonts in this category")
+        print(f"  [OK] Found {len(catalan_in_category)} language-compatible fonts in this category")
 
         time.sleep(2)  # Be respectful to the server
 
@@ -363,10 +384,10 @@ def main():
     print("\n" + "=" * 60)
     print(f"RESULTS:")
     print(f"  Total fonts scraped: {len(all_fonts)}")
-    print(f"  Catalan-compatible fonts: {len(catalan_fonts)}")
+    print(f"  Language-compatible fonts: {len(catalan_fonts)}")
 
     if catalan_fonts:
-        print(f"\nCatalan-compatible fonts found:")
+        print(f"\nLanguage-compatible fonts found:")
         for font in catalan_fonts[:10]:  # Show first 10
             print(f"  • {font['name']}")
             print(f"    {font['url']}")

@@ -1,0 +1,8 @@
+{
+    "language": "spanish",
+    "code": "es",
+    "required_chars": ["á", "é", "í", "ó", "ú", "ñ", "ü", "¿", "¡"],
+    "wikipedia_url": "https://es.wikipedia.org",
+    "wikisource_url": "https://es.wikisource.org",
+    "sample_text": "El niño comió piña en España"
+}

@@ -1,0 +1,8 @@
+{
+    "language": "romanian",
+    "code": "ro",
+    "required_chars": ["ă", "â", "î", "ș", "ț", "Ă", "Â", "Î", "Ș", "Ț"],
+    "wikipedia_url": "https://ro.wikipedia.org",
+    "wikisource_url": "https://ro.wikisource.org",
+    "sample_text": "România este o țară frumoasă din Europa"
+}

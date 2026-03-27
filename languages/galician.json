@@ -1,0 +1,8 @@
+{
+    "language": "galician",
+    "code": "gl",
+    "required_chars": ["á", "é", "í", "ó", "ú", "ñ", "ü"],
+    "wikipedia_url": "https://gl.wikipedia.org",
+    "wikisource_url": "https://gl.wikisource.org",
+    "sample_text": "A lingua galega é moi fermosa"
+}

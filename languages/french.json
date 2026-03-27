@@ -1,0 +1,8 @@
+{
+    "language": "french",
+    "code": "fr",
+    "required_chars": ["à", "â", "æ", "ç", "è", "é", "ê", "ë", "î", "ï", "ô", "ù", "û", "ü", "ÿ", "œ"],
+    "wikipedia_url": "https://fr.wikipedia.org",
+    "wikisource_url": "https://fr.wikisource.org",
+    "sample_text": "Le français est une belle langue"
+}

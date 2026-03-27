@@ -144,7 +144,8 @@ class WikisourceScraper:
 
         # Extraer texto
         # Eliminar scripts, styles, etc.
-        for tag in page_content(['script', 'style', 'sup', 'ref']):
+        #for tag in page_content(['script', 'style', 'sup', 'ref']):  #CANVI
+        for tag in page_content(['script', 'style', 'sup', 'ref', 'img', 'figure', 'figcaption']):
             tag.decompose()
 
         # Obtener texto

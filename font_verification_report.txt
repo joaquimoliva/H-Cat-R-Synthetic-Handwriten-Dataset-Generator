@@ -1,0 +1,451 @@
+============================================================
+FONT VERIFICATION REPORT
+============================================================
+
+Total fonts checked: 119
+Valid fonts: 10
+Invalid fonts: 109
+
+============================================================
+INVALID FONTS DETAILS
+============================================================
+
+
+Handwritten (109 fonts)
+------------------------------------------------------------
+  Font: 212_Baby_Girl
+  Path: Handwritten\212_Baby_Girl\212 Baby Girl.otf
+  Reason: Missing in cmap: ș, Ș, Ț
+
+  Font: 212_Orion_Sans
+  Path: Handwritten\212_Orion_Sans\212 Orion Sans PERSONAL USE.ttf
+  Reason: Missing in cmap: ș, ț, Ș, Ț
+
+  Font: Abstract_Spectrum
+  Path: Handwritten\Abstract_Spectrum\Abstract Spectrum.ttf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: Allura_Script
+  Path: Handwritten\Allura_Script\Allura_Script.ttf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: Alpha_Brights
+  Path: Handwritten\Alpha_Brights\Alpha Brights.otf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: Alpha_Brights
+  Path: Handwritten\Alpha_Brights\Alpha Brights.ttf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: Amertha
+  Path: Handwritten\Amertha\Amertha_PERSONAL_USE_ONLY.ttf
+  Reason: Missing in cmap: ș, ț, Ș, Ț
+
+  Font: Amsterdam
+  Path: Handwritten\Amsterdam\Amsterdam.ttf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: Amsterdam_Signature
+  Path: Handwritten\Amsterdam_Signature\Amsterdam Signature Duo Italic.otf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: Amsterdam_Signature
+  Path: Handwritten\Amsterdam_Signature\Amsterdam Signature Duo Italic.ttf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: Amsterdam_Signature
+  Path: Handwritten\Amsterdam_Signature\Amsterdam Signature Duo.otf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: Amsterdam_Signature
+  Path: Handwritten\Amsterdam_Signature\Amsterdam Signature Duo.ttf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: Amsterdam_Signature
+  Path: Handwritten\Amsterdam_Signature\Amsterdam Signature Italic.otf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: Amsterdam_Signature
+  Path: Handwritten\Amsterdam_Signature\Amsterdam Signature Italic.ttf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: Amsterdam_Signature
+  Path: Handwritten\Amsterdam_Signature\Amsterdam Signature.otf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: Amsterdam_Signature
+  Path: Handwritten\Amsterdam_Signature\Amsterdam Signature.ttf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: Angelina_Malika
+  Path: Handwritten\Angelina_Malika\Angelina Malika - Demo - Personal Use Only.ttf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: Angellica_Signature
+  Path: Handwritten\Angellica_Signature\Angellica Signature.otf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: Au_Bord_de_la_Seine
+  Path: Handwritten\Au_Bord_de_la_Seine\Au Bord de la Seine.ttf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: A_little_sunshine
+  Path: Handwritten\A_little_sunshine\A little sunshine.ttf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: Backline
+  Path: Handwritten\Backline\Backline.otf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: Banana_Super
+  Path: Handwritten\Banana_Super\Banana Super.otf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: Banana_Super
+  Path: Handwritten\Banana_Super\Banana Super.ttf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: Belgian
+  Path: Handwritten\Belgian\Belgian.otf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: Billie_James
+  Path: Handwritten\Billie_James\BillieJames-Regular.otf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: Billie_James
+  Path: Handwritten\Billie_James\BillieJames-Regular.ttf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: Bloom_Velvet
+  Path: Handwritten\Bloom_Velvet\Bloom Velvet.otf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: Bobogo
+  Path: Handwritten\Bobogo\Bobogo.otf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: Boldiaer
+  Path: Handwritten\Boldiaer\Boldiaer.otf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: Breathing
+  Path: Handwritten\Breathing\Breathing Personal Use Only.ttf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: Bridgetta
+  Path: Handwritten\Bridgetta\Bridgetta.otf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: Bright_Dusty
+  Path: Handwritten\Bright_Dusty\Bright Dusty.otf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: Bristol
+  Path: Handwritten\Bristol\Bristol.otf
+  Reason: Missing in cmap: ț, Ț
+
+  Font: Butterfly_Serenade
+  Path: Handwritten\Butterfly_Serenade\Butterfly Serenade - Demo - Personal Use Only.ttf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: B_de_bonita
+  Path: Handwritten\B_de_bonita\b-de-bonita-shadow.ttf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: B_de_bonita
+  Path: Handwritten\B_de_bonita\B-de-bonita.ttf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: Casual_Signature
+  Path: Handwritten\Casual_Signature\Casual Signature.otf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: Chettalbury
+  Path: Handwritten\Chettalbury\Chettalbury Italic.otf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: Chettalbury
+  Path: Handwritten\Chettalbury\Chettalbury Italic.ttf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: Chettalbury
+  Path: Handwritten\Chettalbury\Chettalbury.otf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: Chettalbury
+  Path: Handwritten\Chettalbury\Chettalbury.ttf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: Comptoir_de_la_Gastronomie
+  Path: Handwritten\Comptoir_de_la_Gastronomie\Comptoir de la Gastronomie.ttf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: Content_Cartoon
+  Path: Handwritten\Content_Cartoon\Content Cartoon.otf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: Danymeka
+  Path: Handwritten\Danymeka\Danymeka DEMO VERSION.otf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: Danymeka
+  Path: Handwritten\Danymeka\Danymeka DEMO VERSION.ttf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: Danymeka
+  Path: Handwritten\Danymeka\Danymeka Italic DEMO VERSION.otf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: Danymeka
+  Path: Handwritten\Danymeka\Danymeka Italic DEMO VERSION.ttf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: Darline
+  Path: Handwritten\Darline\Darline.otf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: Dear_Script
+  Path: Handwritten\Dear_Script\Dear Script (Demo_Font).otf
+  Reason: Missing in cmap: ș, ț, Ș, Ț
+
+  Font: Elegant_City
+  Path: Handwritten\Elegant_City\Elegant City.otf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: Fall_In_Love
+  Path: Handwritten\Fall_In_Love\Fall in love.ttf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: Honey_Script
+  Path: Handwritten\Honey_Script\HoneyScript-Light.ttf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: Honey_Script
+  Path: Handwritten\Honey_Script\HoneyScript-SemiBold.ttf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: Human_Intention
+  Path: Handwritten\Human_Intention\Human Intention.otf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: Hunter_Script
+  Path: Handwritten\Hunter_Script\Hunter Script.otf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: January_Night
+  Path: Handwritten\January_Night\January Night.ttf
+  Reason: Missing in cmap: ș, ț, Ș, Ț
+
+  Font: Jimmy_Script
+  Path: Handwritten\Jimmy_Script\JimmyScript-Rg.otf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: Johnston_Airline
+  Path: Handwritten\Johnston_Airline\Johnston Airline.ttf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: Lemon_Tuesday
+  Path: Handwritten\Lemon_Tuesday\Lemon Tuesday.otf
+  Reason: Missing in cmap: ț, Ț
+
+  Font: Lifelism
+  Path: Handwritten\Lifelism\Lifelism.ttf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: Loverine
+  Path: Handwritten\Loverine\Loverine.otf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: Magnolia_Signature
+  Path: Handwritten\Magnolia_Signature\Magnolia Signature.otf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: Mallcity
+  Path: Handwritten\Mallcity\Mallcity.otf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: Midnight_Study
+  Path: Handwritten\Midnight_Study\Midnight Study.otf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: Milky_Matcha
+  Path: Handwritten\Milky_Matcha\Milky Matcha.otf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: Milk_Choco
+  Path: Handwritten\Milk_Choco\Milk Choco.otf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: Mister_Crown
+  Path: Handwritten\Mister_Crown\Mister Crown.otf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: Night_Clash
+  Path: Handwritten\Night_Clash\Night Clash.otf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: Note_to_Selfie
+  Path: Handwritten\Note_to_Selfie\Note to Selfie Bold.ttf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: Note_to_Selfie
+  Path: Handwritten\Note_to_Selfie\Note to Selfie Heavy.ttf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: Note_to_Selfie
+  Path: Handwritten\Note_to_Selfie\Note to Selfie.ttf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: Palms_&_Chill
+  Path: Handwritten\Palms_&_Chill\Palms&Chill-Regular.otf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: Palms_&_Chill
+  Path: Handwritten\Palms_&_Chill\Palms&Chill-Regular.ttf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: Please_write_me_a_song
+  Path: Handwritten\Please_write_me_a_song\Please write me a song.ttf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: Pretty_Daily
+  Path: Handwritten\Pretty_Daily\Pretty Daily.otf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: Random_Wednesday
+  Path: Handwritten\Random_Wednesday\Random Wednesday.ttf
+  Reason: Missing in cmap: ș, ț, Ș, Ț
+
+  Font: Regal_Palms
+  Path: Handwritten\Regal_Palms\Regal Palms.otf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: Retro_Signature
+  Path: Handwritten\Retro_Signature\RetroSignature.otf
+  Reason: Missing in cmap: ș, ț, Ș, Ț
+
+  Font: Rosellinda_Alyamore
+  Path: Handwritten\Rosellinda_Alyamore\Rosellinda Alyamore.otf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: Roustel
+  Path: Handwritten\Roustel\Roustel.ttf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: Serenade_Essentials
+  Path: Handwritten\Serenade_Essentials\Serenade Essentials.otf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: Shadows_Into_Light
+  Path: Handwritten\Shadows_Into_Light\ShadowsIntoLight.ttf
+  Reason: Missing in cmap: ț, Ț
+
+  Font: Signature
+  Path: Handwritten\Signature\Signature.otf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: Simple_Handmade
+  Path: Handwritten\Simple_Handmade\SimpleHandmade.otf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: Simple_Handmade
+  Path: Handwritten\Simple_Handmade\SimpleHandmade.ttf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: Starlight_Romance
+  Path: Handwritten\Starlight_Romance\Starlight Romance.ttf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: Study_Night
+  Path: Handwritten\Study_Night\Study Night.otf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: Summer_Short
+  Path: Handwritten\Summer_Short\Summer Short.otf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: Sunday_Drift
+  Path: Handwritten\Sunday_Drift\Sunday Drift.otf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: Sunny_Script
+  Path: Handwritten\Sunny_Script\Sunny Script.otf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: TrashHand
+  Path: Handwritten\TrashHand\TrashHand.TTF
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: Velvet_Muse
+  Path: Handwritten\Velvet_Muse\Velvet Muse.otf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: Walkyo
+  Path: Handwritten\Walkyo\Walkyo.otf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: Warung_Kopi
+  Path: Handwritten\Warung_Kopi\Warung Kopi Bold Italic.otf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: Warung_Kopi
+  Path: Handwritten\Warung_Kopi\Warung Kopi Bold.otf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: Warung_Kopi
+  Path: Handwritten\Warung_Kopi\Warung Kopi Light Italic.otf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: Warung_Kopi
+  Path: Handwritten\Warung_Kopi\Warung Kopi Light.otf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: Warung_Kopi
+  Path: Handwritten\Warung_Kopi\Warung Kopi Regular Italic.otf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: Warung_Kopi
+  Path: Handwritten\Warung_Kopi\Warung Kopi Regular.otf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: Warung_Kopi
+  Path: Handwritten\Warung_Kopi\Warung Kopi.otf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: Welcome_Darling
+  Path: Handwritten\Welcome_Darling\Welcome Darling.otf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: Wishful_Melisande
+  Path: Handwritten\Wishful_Melisande\Wishful Melisande - Demo - Personal Use Only.ttf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: Xtreem
+  Path: Handwritten\Xtreem\XtreemFat_PERSONAL_USE.ttf
+  Reason: Missing in cmap: ț, Ț
+
+  Font: Xtreem
+  Path: Handwritten\Xtreem\XtreemMedium_PERSONAL_USE.ttf
+  Reason: Missing in cmap: ț, Ț
+
+  Font: Xtreem
+  Path: Handwritten\Xtreem\XtreemThin_PERSONAL_USE.ttf
+  Reason: Missing in cmap: ț, Ț
+
+  Font: Yuanitta
+  Path: Handwritten\Yuanitta\Yuanitta Italic.otf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: Yuanitta
+  Path: Handwritten\Yuanitta\Yuanitta Italic.ttf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: Yuanitta
+  Path: Handwritten\Yuanitta\Yuanitta.otf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+
+  Font: Yuanitta
+  Path: Handwritten\Yuanitta\Yuanitta.ttf
+  Reason: Missing in cmap: ă, ș, ț, Ă, Ș, Ț
+

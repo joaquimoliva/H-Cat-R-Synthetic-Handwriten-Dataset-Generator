@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Verify existing fonts for Catalan character, number, and punctuation support.
+Verify existing fonts for required character, number, and punctuation support.
 Remove fonts that don't support all required characters.
 """
 
@@ -13,15 +13,17 @@ from tqdm import tqdm
 import argparse
 
 class FontVerifier:
-    def __init__(self, fonts_dir='fonts', verbose=False, dry_run=False):
+    def __init__(self, fonts_dir='fonts', language='catalan', verbose=False, dry_run=False):
         self.fonts_dir = Path(fonts_dir)
         self.verbose = verbose
         self.dry_run = dry_run
 
-        # Required characters
+        # Load language config
+        self.language = language
+        self.lang_config = self._load_language_config(language)
+
+        # Base required characters (common to all languages)
         self.required_chars = {
-            0x00B7: ('middle dot', '·'),
-            0x00E7: ('c with cedilla', 'ç'),
             0x0030: ('0 (zero)', '0'),
             0x0031: ('1 (one)', '1'),
             0x0032: ('2 (two)', '2'),
@@ -33,11 +35,14 @@ class FontVerifier:
             0x0038: ('8 (eight)', '8'),
             0x0039: ('9 (nine)', '9'),
             0x002D: ('hyphen-minus', '-'),
-            0x003C: ('less than', '<'),
-            0x003E: ('greater than', '>'),
             0x0028: ('left parenthesis', '('),
             0x0029: ('right parenthesis', ')'),
         }
+
+        # Add language-specific characters
+        for char in self.lang_config.get('required_chars', []):
+            codepoint = ord(char)
+            self.required_chars[codepoint] = (f'lang-specific: {char}', char)
 
         self.stats = {
             'total_fonts': 0,
@@ -48,6 +53,17 @@ class FontVerifier:
         }
 
         self.invalid_fonts = []  # Store info about invalid fonts
+
+    def _load_language_config(self, language):
+        """Carrega la configuració de l'idioma des de languages/"""
+        import json
+        config_path = Path(__file__).parent / 'languages' / f'{language}.json'
+        if config_path.exists():
+            with open(config_path, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        else:
+            print(f"[WARNING] No language config found: {config_path}")
+            return {'required_chars': []}
 
     def check_font_file(self, font_path):
         """
@@ -99,6 +115,59 @@ class FontVerifier:
             except Exception as e:
                 return False, f"PIL rendering error: {str(e)}"
 
+            # Step 3: Detect embedded logos/watermarks
+            # Renders each character individually and checks for anomalies
+            try:
+                logo_font = ImageFont.truetype(str(font_path), 64)
+                char_images = []
+                char_widths = []
+
+                test_chars = list('ABCDEFGHabcdefgh0123456789')
+
+                for char in test_chars:
+                    try:
+                        char_img = Image.new('L', (300, 100), 255)
+                        char_draw = ImageDraw.Draw(char_img)
+                        char_draw.text((10, 10), char, font=logo_font, fill=0)
+
+                        bbox = char_img.getbbox()
+                        if bbox:
+                            width = bbox[2] - bbox[0]
+                            height = bbox[3] - bbox[1]
+                            char_widths.append(width)
+
+                            # Crop to bounding box for comparison
+                            cropped = char_img.crop(bbox)
+                            char_images.append(cropped.tobytes())
+                        else:
+                            char_widths.append(0)
+                            char_images.append(None)
+
+                    except Exception:
+                        char_widths.append(0)
+                        char_images.append(None)
+
+                # Check 1: If any glyph is abnormally wide (> 3x median), likely a logo
+                valid_widths = [w for w in char_widths if w > 0]
+                if valid_widths:
+                    median_width = sorted(valid_widths)[len(valid_widths) // 2]
+                    if median_width > 0:
+                        for i, w in enumerate(char_widths):
+                            if w > median_width * 3:
+                                return False, f"Suspicious glyph detected (logo?): char '{test_chars[i]}' width {w} vs median {median_width}"
+
+                # Check 2: If many different characters produce identical images, likely a logo
+                valid_images = [img for img in char_images if img is not None]
+                if len(valid_images) >= 4:
+                    unique_images = set(valid_images)
+                    duplicate_ratio = 1 - (len(unique_images) / len(valid_images))
+                    if duplicate_ratio > 0.5:
+                        return False, f"Too many identical glyphs ({duplicate_ratio:.0%}): likely embedded logo"
+
+            except Exception as e:
+                if self.verbose:
+                    print(f"    [WARNING] Logo detection skipped: {e}")
+
             return True, "All characters supported and renderable"
 
         except Exception as e:
@@ -131,7 +200,7 @@ class FontVerifier:
     def verify_all_fonts(self):
         """Verify all fonts in the fonts directory"""
         print("=" * 60)
-        print("FONT VERIFICATION - Catalan Characters + Numbers + Punctuation")
+        print("FONT VERIFICATION - language-specific chars + numbers + punctuation")
         print("=" * 60)
         print()
 
@@ -269,8 +338,10 @@ class FontVerifier:
 
 def main():
     parser = argparse.ArgumentParser(
-        description='Verify and clean fonts that don\'t support Catalan characters, numbers, and punctuation'
+        description='Verify and clean fonts that don\'t support certain characters, numbers, and punctuation'
     )
+    parser.add_argument('--language', default='catalan',
+                        help='Idioma per verificar suport de caràcters (default: catalan)')
     parser.add_argument('--fonts-dir', default='fonts', help='Fonts directory (default: fonts)')
     parser.add_argument('--verbose', '-v', action='store_true', help='Show detailed output')
     parser.add_argument('--dry-run', action='store_true', help='Show what would be removed without actually removing')
@@ -281,6 +352,7 @@ def main():
 
     verifier = FontVerifier(
         fonts_dir=args.fonts_dir,
+        language=args.language,
         verbose=args.verbose,
         dry_run=args.dry_run
     )

@@ -1,0 +1,8 @@
+{
+    "language": "basque",
+    "code": "eu",
+    "required_chars": ["ñ", "ü"],
+    "wikipedia_url": "https://eu.wikipedia.org",
+    "wikisource_url": "https://eu.wikisource.org",
+    "sample_text": "Euskal Herria oso polita da"
+}
