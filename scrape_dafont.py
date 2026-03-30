@@ -27,10 +27,13 @@ class DaFontScraper:
         self.use_accent_filter = use_accent_filter and len(self.required_chars) > 0
         self.verbose = verbose
         self.filter_params = "&a=on" if self.use_accent_filter else ""
+        # Fonts amb problemes coneguts: logos, watermarks, glifs trencats
         self.font_blacklist = [
             'Loveletter_No._9',
             'Loveletter No. 9',
             'Autograf',
+            'Borgers',           # Watermark "PERSONAL USE ONLY" en espais/apòstrofs
+            'MN.SG/BORGERS',     # Variant del nom
         ]
 
     def _load_language_config(self, language):
@@ -194,12 +197,17 @@ class DaFontScraper:
                 print(f"      [X] Failed to download: {e}")
             return False
 
-        # Check if it's a ZIP file
-        if response.content[:2] == b'PK':
+        # Check if it's a ZIP file (most DaFont downloads are)
+        content_type = response.headers.get('Content-Type', '')
+        if 'zip' in content_type or download_url.endswith('.zip') or response.content[:2] == b'PK':
             try:
                 with zipfile.ZipFile(io.BytesIO(response.content)) as zf:
-                    # Find TTF or OTF files
-                    font_files = [f for f in zf.namelist() if f.lower().endswith(('.ttf', '.otf'))]
+                    # Find font files
+                    font_files = [
+                        name for name in zf.namelist()
+                        if name.lower().endswith(('.ttf', '.otf'))
+                        and not name.startswith('__MACOSX')
+                    ]
 
                     if not font_files:
                         if self.verbose:

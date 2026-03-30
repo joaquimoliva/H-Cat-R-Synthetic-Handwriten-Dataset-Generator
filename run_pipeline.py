@@ -7,9 +7,9 @@ Executa tots els passos en ordre amb una sola comanda.
     python run_pipeline.py --language catalan -v
 
 Ús amb tots els paràmetres:
-    python run_pipeline.py --language catalan --max-articles 100 --font-categories 5 --font-pages 10 --mode lines --category-filter Handwritten --max-fonts-per-category 20 --workers -1 -v
+    python run_pipeline.py --language catalan --max-articles 100 --font-pages 10 --mode lines --category-filter Handwritten --background-color white,grey --background-type lined,grid --workers -1 -v
 
-Saltar passos (si ja tens textos o fonts descarregats):
+Saltar passos:
     python run_pipeline.py --language catalan --skip-text --skip-fonts -v
 """
 
@@ -65,14 +65,17 @@ Exemples:
   # Pipeline complet per a català (prova ràpida)
   python run_pipeline.py --language catalan --max-articles 10 --font-pages 2 --max-fonts-per-category 5 --max-texts 50 -v
 
-  # Pipeline complet per a castellà
-  python run_pipeline.py --language spanish --max-articles 100 --font-pages 10 -v
+  # Amb filtres de fons
+  python run_pipeline.py --language catalan --background-color grey --background-type lined --skip-text --skip-fonts -v
+
+  # Només paper blanc pautat
+  python run_pipeline.py --language catalan --background-color white --background-type lined --skip-text --skip-fonts -v
+
+  # Sense fons (només blanc llis)
+  python run_pipeline.py --language catalan --no-backgrounds --skip-text --skip-fonts -v
 
   # Només generar dataset (textos i fonts ja descarregats)
   python run_pipeline.py --language catalan --skip-text --skip-fonts -v
-
-  # Només descarregar textos i fonts (sense generar dataset)
-  python run_pipeline.py --language catalan --skip-dataset -v
         """
     )
 
@@ -92,25 +95,31 @@ Exemples:
     parser.add_argument('--skip-dataset', action='store_true',
                         help='Saltar la generació del dataset')
 
-    # Paràmetres de textos (scrape_wikipedia.py)
+    # Paràmetres de textos
     parser.add_argument('--text-source', choices=['wikipedia', 'wikisource'], default='wikipedia',
                         help='Font de textos (default: wikipedia)')
     parser.add_argument('--max-articles', type=int, default=100,
                         help='Nombre màxim d\'articles a descarregar (default: 100)')
 
-    # Paràmetres de fonts (scrape_dafont.py)
-    parser.add_argument('--font-categories', type=int, default=3,
-                        help='Nombre de categories de fonts a escanejar (default: 3)')
+    # Paràmetres de fonts
     parser.add_argument('--font-pages', type=int, default=5,
-                        help='Pàgines per categoria a escanejar (default: 5)')
+                        help='Pàgines a escanejar dins la categoria seleccionada (default: 5)')
 
-    # Paràmetres de generació (build_dataset.py)
+    # Paràmetres de fons
+    parser.add_argument('--background-color', type=str, default=None,
+                        help='Colors de fons, separats per comes (ex: white,grey,beige). Per defecte usa tots')
+    parser.add_argument('--background-type', type=str, default=None,
+                        help='Tipus de fons, separats per comes (ex: plain,grid,lined). Per defecte usa tots')
+    parser.add_argument('--no-backgrounds', action='store_true',
+                        help='Desactivar fons de paper (només blanc llis)')
+
+    # Paràmetres de generació
     parser.add_argument('--mode', choices=['lines', 'words'], default='lines',
                         help='Mode de generació: lines o words (default: lines)')
     parser.add_argument('--style', choices=['normal', 'bold'], default='normal',
                         help='Estil de font (default: normal)')
     parser.add_argument('--category-filter', type=str, default='Handwritten',
-                        help='Filtrar per categories de font, separades per comes (default: Handwritten). Ex: Handwritten,School,Script')
+                        help='Filtrar per categories de font, separades per comes (default: Handwritten)')
     parser.add_argument('--max-fonts-per-category', type=int, default=None,
                         help='Màxim de fonts per categoria')
     parser.add_argument('--max-texts', type=int, default=None,
@@ -133,6 +142,13 @@ Exemples:
     print(f"  Font de textos: {args.text_source}")
     print(f"  Mode: {args.mode}")
     print(f"  Categoria fonts: {args.category_filter}")
+    if args.no_backgrounds:
+        print(f"  Fons: desactivats (només blanc llis)")
+    else:
+        bg_color_str = args.background_color if args.background_color else "tots"
+        bg_type_str = args.background_type if args.background_type else "tots"
+        print(f"  Fons color: {bg_color_str}")
+        print(f"  Fons tipus: {bg_type_str}")
     if args.skip_text:
         print(f"  [SKIP] Descàrrega de textos")
     if args.skip_fonts:
@@ -161,7 +177,7 @@ Exemples:
             ] + verbose_flag
 
         success = run_step(
-            f"1/5 - Descarregar textos ({args.text_source}, {args.language})",
+            f"1/6 - Descarregar textos ({args.text_source}, {args.language})",
             cmd, args.verbose
         )
         if not success:
@@ -182,7 +198,7 @@ Exemples:
         ] + verbose_flag
 
         success = run_step(
-            f"2/5 - Escanejar fonts compatibles amb {args.language}",
+            f"2/6 - Escanejar fonts compatibles amb {args.language}",
             cmd, args.verbose
         )
         if not success:
@@ -194,7 +210,7 @@ Exemples:
         # ============================================================
         csv_file = 'compatible_fonts.csv'
         if not Path(csv_file).exists():
-            csv_file = 'catalan_fonts.csv'  # fallback per compatibilitat
+            csv_file = 'catalan_fonts.csv'
 
         if Path(csv_file).exists():
             cmd = [
@@ -204,7 +220,7 @@ Exemples:
             ]
 
             success = run_step(
-                "3/5 - Descarregar fonts",
+                "3/6 - Descarregar fonts",
                 cmd, args.verbose
             )
             if not success:
@@ -222,7 +238,7 @@ Exemples:
         ] + verbose_flag
 
         success = run_step(
-            f"4/5 - Verificar fonts per a {args.language}",
+            f"4/6 - Verificar fonts per a {args.language}",
             cmd, args.verbose
         )
         if not success:
@@ -232,13 +248,33 @@ Exemples:
         print("\n[SKIP] Passos 2-4 - Descàrrega i verificació de fonts (saltats)")
 
     # ============================================================
-    # PAS 5: Generar dataset
+    # PAS 5: Generar fons de paper (si no existeixen)
+    # ============================================================
+    backgrounds_dir = Path('backgrounds')
+    if not args.no_backgrounds:
+        if not backgrounds_dir.exists() or not any(backgrounds_dir.iterdir()):
+            cmd = [
+                sys.executable, 'generate_backgrounds.py',
+            ] + verbose_flag
+
+            success = run_step(
+                "5/6 - Generar fons de paper",
+                cmd, args.verbose
+            )
+            if not success:
+                print("\n[WARNING] No s'han pogut generar els fons, continuant sense fons")
+        else:
+            bg_count = sum(1 for _ in backgrounds_dir.rglob('*.png'))
+            print(f"\n[OK] Pas 5 - Fons de paper ja existents ({bg_count} imatges)")
+    else:
+        print("\n[SKIP] Pas 5 - Fons de paper (desactivats)")
+
+    # ============================================================
+    # PAS 6: Generar dataset
     # ============================================================
     if not args.skip_dataset:
-        # Determinar data-dir
         data_dir = f"data/wikipedia_{lang_code}" if args.text_source == 'wikipedia' else "data"
 
-        # Netejar output si es demana
         output_dir = 'output'
         if args.output_name:
             output_dir = f'output_{args.output_name}'
@@ -267,15 +303,24 @@ Exemples:
         if args.output_name:
             cmd.extend(['--output-name', args.output_name])
 
+        # Fons de paper
+        if args.no_backgrounds:
+            cmd.extend(['--backgrounds-dir', 'none'])
+        else:
+            if args.background_color:
+                cmd.extend(['--background-color', args.background_color])
+            if args.background_type:
+                cmd.extend(['--background-type', args.background_type])
+
         success = run_step(
-            "5/5 - Generar dataset sintètic",
+            "6/6 - Generar dataset sintètic",
             cmd, args.verbose
         )
         if not success:
-            print("\n[ABORT] Pipeline aturat per error al pas 5")
+            print("\n[ABORT] Pipeline aturat per error al pas 6")
             sys.exit(1)
     else:
-        print("\n[SKIP] Pas 5 - Generació del dataset (saltat)")
+        print("\n[SKIP] Pas 6 - Generació del dataset (saltat)")
 
     # ============================================================
     # RESUM FINAL
@@ -286,6 +331,7 @@ Exemples:
     print(f"  Idioma: {args.language}")
     print(f"  Textos: data/wikipedia_{lang_code}/")
     print(f"  Fonts: fonts/")
+    print(f"  Fons: {'desactivats' if args.no_backgrounds else 'backgrounds/'}")
     output_dir = f"output_{args.output_name}" if args.output_name else "output"
     print(f"  Dataset: {output_dir}/")
     print("=" * 60)

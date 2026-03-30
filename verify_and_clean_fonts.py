@@ -2,6 +2,7 @@
 """
 Verify existing fonts for required character, number, and punctuation support.
 Remove fonts that don't support all required characters.
+Includes watermark detection in special characters (spaces, apostrophes).
 """
 
 import os
@@ -65,6 +66,102 @@ class FontVerifier:
             print(f"[WARNING] No language config found: {config_path}")
             return {'required_chars': []}
 
+    def detect_watermark_in_special_chars(self, font_path, font_size=64):
+        """
+        Detect watermarks embedded in special characters (spaces, apostrophes, etc.)
+        
+        Many DaFont fonts embed "PERSONAL USE ONLY" or similar watermarks in:
+        - Space character (U+0020)
+        - Apostrophe (U+0027)
+        - Quotation marks (U+0022, U+2018, U+2019)
+        - Other punctuation
+        
+        Detection strategy:
+        1. Render a phrase WITH special chars and measure total width
+        2. Render the same phrase WITHOUT special chars
+        3. Calculate expected space width based on letter widths
+        4. If actual space width >> expected, likely contains watermark
+        
+        Returns: (is_clean, reason)
+        """
+        try:
+            pil_font = ImageFont.truetype(str(font_path), font_size)
+            
+            # Test phrases - one with spaces/apostrophes, one without
+            test_with_spaces = "a b c d e"      # 4 spaces
+            test_without_spaces = "abcde"        # same letters, no spaces
+            test_with_apostrophe = "it's here"   # has apostrophe
+            test_without_apostrophe = "itshere"  # no apostrophe
+            
+            # Create temporary image for measurements
+            temp_img = Image.new('RGB', (2000, 100), 'white')
+            draw = ImageDraw.Draw(temp_img)
+            
+            # Measure widths
+            def get_text_width(text):
+                bbox = draw.textbbox((0, 0), text, font=pil_font)
+                return bbox[2] - bbox[0]
+            
+            # Get reference letter width (average of a few common letters)
+            ref_letters = "abcdefghij"
+            ref_width = get_text_width(ref_letters) / len(ref_letters)
+            
+            # Expected space width: typically 20-50% of average letter width
+            expected_space_width = ref_width * 0.5
+            max_reasonable_space_width = ref_width * 1.5  # generous upper bound
+            
+            # Calculate actual space width
+            width_with_spaces = get_text_width(test_with_spaces)
+            width_without_spaces = get_text_width(test_without_spaces)
+            num_spaces = test_with_spaces.count(' ')
+            actual_space_width = (width_with_spaces - width_without_spaces) / num_spaces if num_spaces > 0 else 0
+            
+            # Check if space is suspiciously wide (contains watermark)
+            if actual_space_width > max_reasonable_space_width * 3:
+                return False, f"Space char contains watermark (width: {actual_space_width:.0f}px vs expected ~{expected_space_width:.0f}px)"
+            
+            # Check apostrophe similarly
+            width_with_apos = get_text_width(test_with_apostrophe)
+            width_without_apos = get_text_width(test_without_apostrophe)
+            actual_apos_width = width_with_apos - width_without_apos + ref_width  # account for missing letter
+            
+            if actual_apos_width > max_reasonable_space_width * 4:
+                return False, f"Apostrophe contains watermark (width: {actual_apos_width:.0f}px vs expected ~{expected_space_width:.0f}px)"
+            
+            # Visual check: render phrase with spaces and look for repeated patterns
+            # This catches watermarks that might appear as visual noise
+            test_phrase = "a a a a a"  # Multiple spaces
+            phrase_img = Image.new('L', (2000, 100), 255)
+            phrase_draw = ImageDraw.Draw(phrase_img)
+            phrase_draw.text((10, 10), test_phrase, font=pil_font, fill=0)
+            
+            # Crop to content
+            bbox = phrase_img.getbbox()
+            if bbox:
+                cropped = phrase_img.crop(bbox)
+                
+                # Count dark pixels (text content)
+                pixels = list(cropped.getdata())
+                dark_pixels = sum(1 for p in pixels if p < 200)
+                total_pixels = len(pixels)
+                
+                # Expected: mostly white with some dark letters
+                # Watermark fonts: much higher dark pixel ratio due to embedded text
+                dark_ratio = dark_pixels / total_pixels if total_pixels > 0 else 0
+                
+                # Normal handwriting font: ~5-15% dark pixels for "a a a a a"
+                # Watermark font: >25% due to extra embedded text
+                if dark_ratio > 0.25:
+                    return False, f"Excessive ink in spaces suggests watermark (dark pixel ratio: {dark_ratio:.1%})"
+            
+            return True, "No watermark detected in special characters"
+            
+        except Exception as e:
+            if self.verbose:
+                print(f"    [WARNING] Watermark detection error: {e}")
+            # Don't reject font on detection error, just skip this check
+            return True, f"Watermark detection skipped: {e}"
+
     def check_font_file(self, font_path):
         """
         Check if a font file supports all required characters
@@ -115,7 +212,7 @@ class FontVerifier:
             except Exception as e:
                 return False, f"PIL rendering error: {str(e)}"
 
-            # Step 3: Detect embedded logos/watermarks
+            # Step 3: Detect embedded logos/watermarks in regular glyphs
             # Renders each character individually and checks for anomalies
             try:
                 logo_font = ImageFont.truetype(str(font_path), 64)
@@ -168,6 +265,16 @@ class FontVerifier:
                 if self.verbose:
                     print(f"    [WARNING] Logo detection skipped: {e}")
 
+            # Step 4: NEW - Detect watermarks in special characters (spaces, apostrophes)
+            # This catches fonts like "Borgers" that embed "PERSONAL USE ONLY" in spaces
+            try:
+                is_clean, watermark_reason = self.detect_watermark_in_special_chars(font_path)
+                if not is_clean:
+                    return False, watermark_reason
+            except Exception as e:
+                if self.verbose:
+                    print(f"    [WARNING] Special char watermark detection skipped: {e}")
+
             return True, "All characters supported and renderable"
 
         except Exception as e:
@@ -201,6 +308,7 @@ class FontVerifier:
         """Verify all fonts in the fonts directory"""
         print("=" * 60)
         print("FONT VERIFICATION - language-specific chars + numbers + punctuation")
+        print("               + watermark detection in spaces/apostrophes")
         print("=" * 60)
         print()
 
