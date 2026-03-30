@@ -112,7 +112,7 @@ def main():
         with open(args.csv_file, 'r', encoding='utf-8') as f:
             reader = csv.DictReader(f)
             for row in reader:
-                if row.get('supports_catalan') == 'True':
+                if row.get('supports_language') == 'True' or row.get('supports_catalan') == 'True':
                     fonts_to_download.append(row)
                     categories.add(row['category'])
     except Exception as e:

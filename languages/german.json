@@ -1,0 +1,8 @@
+{
+    "language": "german",
+    "code": "de",
+    "required_chars": ["ä", "ö", "ü", "ß", "Ä", "Ö", "Ü"],
+    "wikipedia_url": "https://de.wikipedia.org",
+    "wikisource_url": "https://de.wikisource.org",
+    "sample_text": "Die schöne Straße führt über den Fluss"
+}

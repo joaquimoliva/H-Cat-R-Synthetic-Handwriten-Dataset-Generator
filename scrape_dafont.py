@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 DaFont Scraper for Language-Compatible Fonts
-Finds fonts that support Catalan special characters, particularly l·l
+Finds fonts that support language-specific special characters
 """
 
 import requests
@@ -167,7 +167,7 @@ class DaFontScraper:
                 info['download_url'] = urljoin(self.base_url, link['href'])
                 break
 
-        # Check font file for Catalan support by downloading and inspecting it
+        # Check font file for language support by downloading and inspecting it
         if info['download_url']:
             language_support = self.check_character_support(info['download_url'])
             info['supports_language'] = language_support
@@ -176,14 +176,9 @@ class DaFontScraper:
 
     def check_character_support(self, download_url):
         """
-        Check if a font supports Catalan-specific characters, numbers, and punctuation by downloading and inspecting the font file.
-        Since we're using the accent filter (&a=on), we need to verify:
-        - U+00B7 (middle dot ·)
-        - U+00E7 (ç with cedilla)
-        - U+0030 to U+0039 (digits 0-9)
-        - U+002D (hyphen -)
-        - U+003C and U+003E (< >)
-        - U+0028 and U+0029 (parentheses)
+        Check if a font supports language-specific characters, numbers,
+        and punctuation by downloading and inspecting the font file.
+        Characters are loaded from the language config file (languages/*.json).
         """
         if not download_url:
             if self.verbose:
@@ -196,14 +191,11 @@ class DaFontScraper:
             response.raise_for_status()
         except Exception as e:
             if self.verbose:
-                print(f"      [X] Failed to download font: {e}")
+                print(f"      [X] Failed to download: {e}")
             return False
 
-        # Extract font file from ZIP if needed
-        font_data = None
-        font_filename = None
-
-        if response.content[:2] == b'PK':  # ZIP file
+        # Check if it's a ZIP file
+        if response.content[:2] == b'PK':
             try:
                 with zipfile.ZipFile(io.BytesIO(response.content)) as zf:
                     # Find TTF or OTF files
@@ -266,10 +258,10 @@ class DaFontScraper:
                 if self.verbose:
                     print(f"      [X] Missing {char} (U+{codepoint:04X}) - {name}")
 
-        # STRICT REQUIREMENT: ALL required characters must be present (language-specific chars + numbers + punctuation)
+        # STRICT REQUIREMENT: ALL required characters must be present
         if all(results.values()):
             if self.verbose:
-                print(f"      [ACCEPT] Font has all required characters (language-specific chars + numbers + punctuation)")
+                print(f"      [ACCEPT] Font has all required characters ({self.language})")
             return True
         else:
             if self.verbose:
@@ -318,7 +310,7 @@ class DaFontScraper:
 def main():
     parser = argparse.ArgumentParser(description='Scrape DaFont for language-compatible fonts')
     parser.add_argument('--language', default='catalan',
-                        help='Idioma per filtrar fonts (default: catalan). Opcionas: catalan, spanish, basque, galician, french, english')
+                        help='Language to filter fonts (default: catalan). Options: catalan, spanish, basque, galician, french, english, german, etc.')
     parser.add_argument('--categories', type=int, default=3, help='Number of categories to scrape')
     parser.add_argument('--category-filter', type=str, default=None,
                         help='Filter by category name(s), comma-separated (e.g., "Handwritten,Script,Brush")')
@@ -338,6 +330,7 @@ def main():
     )
 
     print(f"Starting DaFont scraper for {args.language} fonts...")
+    print(f"  Required chars: {', '.join(scraper.required_chars) if scraper.required_chars else '(base only)'}")
     print("=" * 60)
     if scraper.use_accent_filter:
         print("[OK] Using DaFont's accent filter (&a=on)")
@@ -365,7 +358,7 @@ def main():
         categories_to_scrape = categories[:args.categories]
 
     all_fonts = []
-    catalan_fonts = []
+    compatible_fonts = []
 
     # Scrape fonts from each category
     for i, (cat_name, cat_url) in enumerate(categories_to_scrape, 1):
@@ -373,29 +366,30 @@ def main():
         fonts = scraper.scrape_category(cat_url, cat_name, max_pages=args.pages)
         all_fonts.extend(fonts)
 
-        # Filter for Catalan support
-        catalan_in_category = [f for f in fonts if f.get('supports_language')]
-        catalan_fonts.extend(catalan_in_category)
-        print(f"  [OK] Found {len(catalan_in_category)} language-compatible fonts in this category")
+        # Filter for language support
+        compatible_in_category = [f for f in fonts if f.get('supports_language')]
+        compatible_fonts.extend(compatible_in_category)
+        print(f"  [OK] Found {len(compatible_in_category)} {args.language}-compatible fonts in this category")
 
         time.sleep(2)  # Be respectful to the server
 
     # Results
     print("\n" + "=" * 60)
     print(f"RESULTS:")
+    print(f"  Language: {args.language}")
     print(f"  Total fonts scraped: {len(all_fonts)}")
-    print(f"  Language-compatible fonts: {len(catalan_fonts)}")
+    print(f"  Compatible fonts: {len(compatible_fonts)}")
 
-    if catalan_fonts:
-        print(f"\nLanguage-compatible fonts found:")
-        for font in catalan_fonts[:10]:  # Show first 10
+    if compatible_fonts:
+        print(f"\n{args.language.capitalize()}-compatible fonts found:")
+        for font in compatible_fonts[:10]:  # Show first 10
             print(f"  • {font['name']}")
             print(f"    {font['url']}")
 
     # Save results
-    scraper.save_results(catalan_fonts, args.output)
+    scraper.save_results(compatible_fonts, args.output)
 
-    print("\n[SUCCESS] Scraping complete!")
+    print(f"\n[SUCCESS] Scraping complete!")
 
 if __name__ == "__main__":
     main()

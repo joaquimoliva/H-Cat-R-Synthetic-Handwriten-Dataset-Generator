@@ -1,0 +1,8 @@
+{
+    "language": "occitan",
+    "code": "oc",
+    "required_chars": ["à", "á", "è", "é", "í", "ï", "ò", "ó", "ú", "ü", "ç"],
+    "wikipedia_url": "https://oc.wikipedia.org",
+    "wikisource_url": "https://oc.wikisource.org",
+    "sample_text": "L'occitan es una lenga romanca fòrça bèla"
+}

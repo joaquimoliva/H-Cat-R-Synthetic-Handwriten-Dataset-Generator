@@ -1,0 +1,8 @@
+{
+    "language": "dutch",
+    "code": "nl",
+    "required_chars": ["é", "ë", "ï", "ö", "ü"],
+    "wikipedia_url": "https://nl.wikipedia.org",
+    "wikisource_url": "https://nl.wikisource.org",
+    "sample_text": "De Nederlandse taal is heel interessant en mooi"
+}

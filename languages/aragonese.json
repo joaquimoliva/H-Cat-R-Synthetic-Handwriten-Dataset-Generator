@@ -1,0 +1,8 @@
+{
+    "language": "aragonese",
+    "code": "an",
+    "required_chars": ["á", "é", "í", "ó", "ú", "ñ", "ü"],
+    "wikipedia_url": "https://an.wikipedia.org",
+    "wikisource_url": "https://an.wikisource.org",
+    "sample_text": "L'aragonés ye una luenga romanz molt antiga"
+}

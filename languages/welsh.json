@@ -1,0 +1,8 @@
+{
+    "language": "welsh",
+    "code": "cy",
+    "required_chars": ["â", "ê", "î", "ô", "û", "ŵ", "ŷ", "à", "è", "ì", "ò", "ù"],
+    "wikipedia_url": "https://cy.wikipedia.org",
+    "wikisource_url": "https://cy.wikisource.org",
+    "sample_text": "Mae'r Gymraeg yn iaith hynafol a hardd"
+}

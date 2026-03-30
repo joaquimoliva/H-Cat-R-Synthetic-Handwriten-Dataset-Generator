@@ -1,0 +1,8 @@
+{
+    "language": "polish",
+    "code": "pl",
+    "required_chars": ["ą", "ć", "ę", "ł", "ń", "ó", "ś", "ź", "ż"],
+    "wikipedia_url": "https://pl.wikipedia.org",
+    "wikisource_url": "https://pl.wikisource.org",
+    "sample_text": "Język polski jest bardzo piękny i złożony"
+}

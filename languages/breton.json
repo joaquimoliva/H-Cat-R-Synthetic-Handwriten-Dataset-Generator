@@ -1,0 +1,8 @@
+{
+    "language": "breton",
+    "code": "br",
+    "required_chars": ["â", "ê", "î", "ô", "û", "ù", "ü", "ñ", "c'h"],
+    "wikipedia_url": "https://br.wikipedia.org",
+    "wikisource_url": "https://br.wikisource.org",
+    "sample_text": "Ar brezhoneg zo ur yezh keltiek brav-tre"
+}

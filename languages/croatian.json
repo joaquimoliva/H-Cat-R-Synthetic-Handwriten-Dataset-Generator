@@ -1,0 +1,8 @@
+{
+    "language": "croatian",
+    "code": "hr",
+    "required_chars": ["č", "ć", "đ", "š", "ž"],
+    "wikipedia_url": "https://hr.wikipedia.org",
+    "wikisource_url": "https://hr.wikisource.org",
+    "sample_text": "Hrvatski jezik koristi latinično pismo"
+}

@@ -1,0 +1,8 @@
+{
+    "language": "asturian",
+    "code": "ast",
+    "required_chars": ["á", "é", "í", "ó", "ú", "ñ", "ü"],
+    "wikipedia_url": "https://ast.wikipedia.org",
+    "wikisource_url": "https://ast.wikisource.org",
+    "sample_text": "La llingua asturiana ye mui fermosa y antigua"
+}

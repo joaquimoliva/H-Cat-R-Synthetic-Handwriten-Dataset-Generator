@@ -1,0 +1,8 @@
+{
+    "language": "italian",
+    "code": "it",
+    "required_chars": ["à", "è", "é", "ì", "ò", "ù"],
+    "wikipedia_url": "https://it.wikipedia.org",
+    "wikisource_url": "https://it.wikisource.org",
+    "sample_text": "L'Italia è un paese bellissimo e ricco di storia"
+}

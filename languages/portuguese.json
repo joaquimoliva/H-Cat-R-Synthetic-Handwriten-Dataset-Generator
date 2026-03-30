@@ -1,0 +1,8 @@
+{
+    "language": "portuguese",
+    "code": "pt",
+    "required_chars": ["á", "â", "ã", "à", "é", "ê", "í", "ó", "ô", "õ", "ú", "ç"],
+    "wikipedia_url": "https://pt.wikipedia.org",
+    "wikisource_url": "https://pt.wikisource.org",
+    "sample_text": "A língua portuguesa é muito bonita e expressiva"
+}

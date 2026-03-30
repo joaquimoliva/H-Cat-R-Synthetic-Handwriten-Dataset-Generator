@@ -154,167 +154,195 @@ class SyntheticDatasetBuilder:
         self.texts = []
 
     def scan_fonts(self):
-        """Escanea el directorio de fuentes y detecta las que tienen bold"""
-        print("[1] Escaneando fuentes...")
+            """Escanea el directorio de fuentes y detecta las que tienen bold"""
+            print("[1] Escaneando fuentes...")
 
-        if self.category_filter:
-            print(f"  [FILTRO] Solo usando categoría: {self.category_filter}")
+            if self.category_filter:
+                self.category_filter_list = [c.strip() for c in self.category_filter.split(',')]
+                print(f"  [FILTRO] Solo usando categorías: {', '.join(self.category_filter_list)}")
+            else:
+                self.category_filter_list = None
 
-        # Agrupar fuentes por categoría antes de aplicar límite
-        fonts_by_category = defaultdict(list)
+            # Agrupar fuentes por categoría antes de aplicar límite
+            fonts_by_category = defaultdict(list)
 
-        # Recorrer todas las carpetas de fuentes
-        for category_dir in self.fonts_dir.iterdir():
-            if not category_dir.is_dir():
-                continue
-
-            # Aplicar filtro de categoría si está especificado
-            if self.category_filter and category_dir.name != self.category_filter:
-                if self.verbose:
-                    print(f"  [SKIP] Categoría {category_dir.name} (filtrada)")
-                continue
-
-            for font_dir in category_dir.iterdir():
-                if not font_dir.is_dir():
+            # Recorrer todas las carpetas de fuentes
+            for category_dir in self.fonts_dir.iterdir():
+                if not category_dir.is_dir():
                     continue
 
-                # Buscar archivos de fuente en esta carpeta
-                font_files = list(font_dir.glob('*.ttf')) + list(font_dir.glob('*.otf'))
-
-                if not font_files:
+                # Aplicar filtro de categoría si está especificado
+                if self.category_filter_list and category_dir.name not in self.category_filter_list:
+                    if self.verbose:
+                        print(f"  [SKIP] Categoría {category_dir.name} (filtrada)")
                     continue
 
-                # Clasificar archivos por estilo
-                normal_fonts = []
-                bold_fonts = []
+                for font_dir in category_dir.iterdir():
+                    if not font_dir.is_dir():
+                        continue
 
-                for font_file in font_files:
-                    font_name_lower = font_file.name.lower()
+                    # Buscar archivos de fuente en esta carpeta
+                    font_files = list(font_dir.glob('*.ttf')) + list(font_dir.glob('*.otf'))
 
-                    # Detectar si es bold
-                    if any(keyword in font_name_lower for keyword in ['bold', 'bd', 'heavy', 'black']):
-                        # Excluir italic-bold si solo queremos bold
-                        if 'italic' not in font_name_lower and 'oblique' not in font_name_lower:
-                            bold_fonts.append(font_file)
-                    # Detectar si es normal (no italic, no bold)
-                    elif not any(keyword in font_name_lower for keyword in ['italic', 'oblique', 'bold', 'bd', 'heavy', 'black']):
-                        normal_fonts.append(font_file)
+                    if not font_files:
+                        continue
 
-                # Determinar si esta fuente tiene bold
-                has_bold = len(bold_fonts) > 0
+                    # Clasificar archivos por estilo
+                    normal_fonts = []
+                    bold_fonts = []
 
-                if has_bold:
-                    self.stats['fonts_with_bold'] += 1
-                else:
-                    self.stats['fonts_without_bold'] += 1
+                    for font_file in font_files:
+                        font_name_lower = font_file.name.lower()
 
-                # Preparar información de fuente según el estilo requerido
-                font_info = None
-                if self.style == 'bold':
+                        # Detectar si es bold
+                        if any(keyword in font_name_lower for keyword in ['bold', 'bd', 'heavy', 'black']):
+                            # Excluir italic-bold si solo queremos bold
+                            if 'italic' not in font_name_lower and 'oblique' not in font_name_lower:
+                                bold_fonts.append(font_file)
+                        # Detectar si es normal (no italic, no bold)
+                        elif not any(keyword in font_name_lower for keyword in ['italic', 'oblique', 'bold', 'bd', 'heavy', 'black']):
+                            normal_fonts.append(font_file)
+
+                    # Determinar si esta fuente tiene bold
+                    has_bold = len(bold_fonts) > 0
+
                     if has_bold:
-                        font_info = {
-                            'path': bold_fonts[0],
-                            'name': font_dir.name,
-                            'category': category_dir.name,
-                            'style': 'bold'
-                        }
+                        self.stats['fonts_with_bold'] += 1
                     else:
-                        self.stats['fonts_skipped'] += 1
-                        if self.verbose:
-                            print(f"  [SKIP] {category_dir.name}/{font_dir.name} - Sin bold")
-                elif self.style == 'normal':
-                    if normal_fonts:
-                        font_info = {
-                            'path': normal_fonts[0],
-                            'name': font_dir.name,
-                            'category': category_dir.name,
-                            'style': 'normal'
-                        }
-                    else:
-                        self.stats['fonts_skipped'] += 1
-                        if self.verbose:
-                            print(f"  [SKIP] {category_dir.name}/{font_dir.name} - Sin normal")
+                        self.stats['fonts_without_bold'] += 1
 
-                # Agregar a la categoría correspondiente
-                if font_info:
-                    fonts_by_category[category_dir.name].append(font_info)
+                    # Preparar información de fuente según el estilo requerido
+                    font_info = None
+                    if self.style == 'bold':
+                        if has_bold:
+                            font_info = {
+                                'path': bold_fonts[0],
+                                'name': font_dir.name,
+                                'category': category_dir.name,
+                                'style': 'bold'
+                            }
+                        else:
+                            self.stats['fonts_skipped'] += 1
+                            if self.verbose:
+                                print(f"  [SKIP] {category_dir.name}/{font_dir.name} - Sin bold")
+                    elif self.style == 'normal':
+                        if normal_fonts:
+                            font_info = {
+                                'path': normal_fonts[0],
+                                'name': font_dir.name,
+                                'category': category_dir.name,
+                                'style': 'normal'
+                            }
+                        else:
+                            self.stats['fonts_skipped'] += 1
+                            if self.verbose:
+                                print(f"  [SKIP] {category_dir.name}/{font_dir.name} - Sin normal")
 
-        # Aplicar límite por categoría si está especificado
-        category_stats = {}
-        for category_name, category_fonts in fonts_by_category.items():
-            available = len(category_fonts)
+                    # Agregar a la categoría correspondiente
+                    if font_info:
+                        fonts_by_category[category_dir.name].append(font_info)
 
-            if self.max_fonts_per_category is not None and available > self.max_fonts_per_category:
-                # Mezclar aleatoriamente y tomar solo el límite
-                random.shuffle(category_fonts)
-                selected_fonts = category_fonts[:self.max_fonts_per_category]
-                used = len(selected_fonts)
-            else:
-                # Usar todas las disponibles
-                selected_fonts = category_fonts
-                used = available
+            # Aplicar límite por categoría si está especificado
+            category_stats = {}
+            for category_name, category_fonts in fonts_by_category.items():
+                available = len(category_fonts)
 
-            self.fonts.extend(selected_fonts)
-            category_stats[category_name] = {'available': available, 'used': used}
+                if self.max_fonts_per_category is not None and available > self.max_fonts_per_category:
+                    # Mezclar aleatoriamente y tomar solo el límite
+                    random.shuffle(category_fonts)
+                    selected_fonts = category_fonts[:self.max_fonts_per_category]
+                    used = len(selected_fonts)
+                else:
+                    # Usar todas las disponibles
+                    selected_fonts = category_fonts
+                    used = available
 
-        # Actualizar estadísticas globales
-        self.stats['fonts_used'] = len(self.fonts)
+                self.fonts.extend(selected_fonts)
+                category_stats[category_name] = {'available': available, 'used': used}
 
-        # Mostrar resumen
-        print(f"  [OK] Fuentes escaneadas:")
-        print(f"    Con bold: {self.stats['fonts_with_bold']}")
-        print(f"    Sin bold: {self.stats['fonts_without_bold']}")
-        print(f"    Fuentes usadas ({self.style}): {self.stats['fonts_used']}")
-        print(f"    Fuentes saltadas: {self.stats['fonts_skipped']}")
+            # Actualizar estadísticas globales
+            self.stats['fonts_used'] = len(self.fonts)
 
-        # Mostrar estadísticas por categoría
-        if self.max_fonts_per_category is not None:
-            print(f"\n  [INFO] Límite por categoría: {self.max_fonts_per_category}")
-        print(f"\n  Fuentes por categoría:")
-        for category_name in sorted(category_stats.keys()):
-            stats = category_stats[category_name]
-            if stats['used'] < stats['available']:
-                print(f"    {category_name}: {stats['used']}/{stats['available']} (limitado)")
-            else:
-                print(f"    {category_name}: {stats['used']}/{stats['available']}")
+            # Mostrar resumen
+            print(f"  [OK] Fuentes escaneadas:")
+            print(f"    Con bold: {self.stats['fonts_with_bold']}")
+            print(f"    Sin bold: {self.stats['fonts_without_bold']}")
+            print(f"    Fuentes usadas ({self.style}): {self.stats['fonts_used']}")
+            print(f"    Fuentes saltadas: {self.stats['fonts_skipped']}")
+
+            # Mostrar estadísticas por categoría
+            if self.max_fonts_per_category is not None:
+                print(f"\n  [INFO] Límite por categoría: {self.max_fonts_per_category}")
+            print(f"\n  Fuentes por categoría:")
+            for category_name in sorted(category_stats.keys()):
+                stats = category_stats[category_name]
+                if stats['used'] < stats['available']:
+                    print(f"    {category_name}: {stats['used']}/{stats['available']} (limitado)")
+                else:
+                    print(f"    {category_name}: {stats['used']}/{stats['available']}")
 
     def load_texts(self):
         """Carga todos los textos del directorio data"""
         print("\n[2] Cargando textos...")
 
+        # Search for .txt files directly in data_dir AND in subdirectories
+        txt_sources = []
+
+        # Direct .txt files in data_dir
+        for txt_file in self.data_dir.glob('*.txt'):
+            txt_sources.append((txt_file, self.data_dir.name))
+
+        # .txt files inside subdirectories
         for book_dir in self.data_dir.iterdir():
             if not book_dir.is_dir():
                 continue
-
             for txt_file in book_dir.glob('*.txt'):
-                try:
-                    with open(txt_file, 'r', encoding='utf-8') as f:
-                        content = f.read()
+                txt_sources.append((txt_file, book_dir.name))
 
-                    # Dividir en líneas
-                    lines = [line.strip() for line in content.split('\n') if line.strip()]
+        for txt_file, book_name in txt_sources:
+            try:
+                with open(txt_file, 'r', encoding='utf-8') as f:
+                    content = f.read()
 
-                    for line in lines:
-                        # Dividir cada línea en grupos de 5 palabras
-                        words = line.split()
+                # Split by sentences using punctuation
+                import re
+                # Clean newlines and extra spaces
+                content = content.replace('\n', ' ')
+                content = re.sub(r'\s+', ' ', content)
 
-                        # Crear líneas de 5 palabras
-                        for i in range(0, len(words), 5):
-                            chunk = words[i:i+5]
-                            #if chunk:  # Solo agregar si hay palabras
-                            text = ' '.join(chunk)  #CANVI
-                            if len(text) >= 3 and any(c.isalpha() for c in text): #CANVI
+                # Split by sentences using punctuation
+                sentences = re.split(r'(?<=[.!?;:])\s+', content)
+
+                for sentence in sentences:
+                    sentence = sentence.strip()
+                    words = sentence.split()
+
+                    # Filter: between 3 and 15 words, at least one letter
+                    if 3 <= len(words) <= 15 and any(c.isalpha() for c in sentence):
+                        self.texts.append({
+                            'text': sentence,
+                            'book': book_name,
+                            'file': txt_file.name
+                        })
+                    # If sentence is too long, split into natural chunks
+                    elif len(words) > 15:
+                        # Split at commas or semicolons
+                        subparts = re.split(r'(?<=[,;])\s+', sentence)
+                        for part in subparts:
+                            part = part.strip()
+                            part_words = part.split()
+                            if 3 <= len(part_words) <= 15 and any(c.isalpha() for c in part):
                                 self.texts.append({
-                                    'text': ' '.join(chunk),
-                                    'book': book_dir.name,
+                                    'text': part,
+                                    'book': book_name,
                                     'file': txt_file.name
                                 })
 
-                except Exception as e:
-                    if self.verbose:
-                        print(f"  [ERROR] Error leyendo {txt_file}: {e}")
+            except Exception as e:
+                if self.verbose:
+                    print(f"  [ERROR] Error leyendo {txt_file}: {e}")
 
-        print(f"  [OK] {len(self.texts)} líneas de texto cargadas (5 palabras por línea)")
+        print(f"  [OK] {len(self.texts)} frases cargadas")
 
     def generate_image(self, text, font_info, target_height=128):
         """

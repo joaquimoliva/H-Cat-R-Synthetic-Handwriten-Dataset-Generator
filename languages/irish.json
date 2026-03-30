@@ -1,0 +1,8 @@
+{
+    "language": "irish",
+    "code": "ga",
+    "required_chars": ["á", "é", "í", "ó", "ú"],
+    "wikipedia_url": "https://ga.wikipedia.org",
+    "wikisource_url": "https://ga.wikisource.org",
+    "sample_text": "Is teanga álainn í an Ghaeilge"
+}
