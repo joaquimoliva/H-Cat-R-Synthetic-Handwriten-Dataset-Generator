@@ -25,19 +25,52 @@ class FontVerifier:
 
         # Base required characters (common to all languages)
         self.required_chars = {
-            0x0030: ('0 (zero)', '0'),
-            0x0031: ('1 (one)', '1'),
-            0x0032: ('2 (two)', '2'),
-            0x0033: ('3 (three)', '3'),
-            0x0034: ('4 (four)', '4'),
-            0x0035: ('5 (five)', '5'),
-            0x0036: ('6 (six)', '6'),
-            0x0037: ('7 (seven)', '7'),
-            0x0038: ('8 (eight)', '8'),
-            0x0039: ('9 (nine)', '9'),
-            0x002D: ('hyphen-minus', '-'),
+            # Digits
+            0x0030: ('digit 0', '0'),
+            0x0031: ('digit 1', '1'),
+            0x0032: ('digit 2', '2'),
+            0x0033: ('digit 3', '3'),
+            0x0034: ('digit 4', '4'),
+            0x0035: ('digit 5', '5'),
+            0x0036: ('digit 6', '6'),
+            0x0037: ('digit 7', '7'),
+            0x0038: ('digit 8', '8'),
+            0x0039: ('digit 9', '9'),
+            
+            # Basic punctuation
+            0x002E: ('period', '.'),
+            0x002C: ('comma', ','),
+            0x003A: ('colon', ':'),
+            0x003B: ('semicolon', ';'),
+            0x0021: ('exclamation mark', '!'),
+            0x003F: ('question mark', '?'),
+            
+            # Quotes and apostrophes
+            0x0027: ('apostrophe', "'"),
+            0x0022: ('quotation mark', '"'),
+            
+            # Brackets and parentheses
             0x0028: ('left parenthesis', '('),
             0x0029: ('right parenthesis', ')'),
+            0x005B: ('left bracket', '['),
+            0x005D: ('right bracket', ']'),
+            
+            # Hyphens and dashes
+            0x002D: ('hyphen-minus', '-'),
+            
+            # Common symbols
+            0x0025: ('percent', '%'),
+            0x0026: ('ampersand', '&'),
+            0x0040: ('at sign', '@'),
+            0x002F: ('slash', '/'),
+            
+            # Mathematical
+            0x002B: ('plus', '+'),
+            0x003D: ('equals', '='),
+            
+            # Currency (common)
+            0x20AC: ('euro', '€'),
+            0x0024: ('dollar', '$'),
         }
 
         # Add language-specific characters
@@ -186,10 +219,19 @@ class FontVerifier:
 
             # Step 2: Test actual rendering with PIL (more robust check)
             # This catches fonts that have cmap entries but fail to render
+            # Also detects .notdef glyphs (empty boxes for missing characters)
             try:
                 pil_font = ImageFont.truetype(str(font_path), 32)
-                test_img = Image.new('RGB', (200, 50), 'white')
+                test_img = Image.new('L', (100, 50), 255)  # Grayscale for comparison
                 draw = ImageDraw.Draw(test_img)
+
+                # First, get reference image of .notdef glyph (missing character box)
+                # Use a character that almost certainly doesn't exist
+                notdef_img = Image.new('L', (100, 50), 255)
+                notdef_draw = ImageDraw.Draw(notdef_img)
+                notdef_draw.text((10, 10), '\uffff', font=pil_font, fill=0)  # U+FFFF rarely exists
+                notdef_bbox = notdef_img.getbbox()
+                notdef_bytes = notdef_img.crop(notdef_bbox).tobytes() if notdef_bbox else None
 
                 # Test each required character
                 cannot_render = []
@@ -202,12 +244,31 @@ class FontVerifier:
                         # Some fonts have glyphs with 0 width for missing chars
                         if width <= 0:
                             cannot_render.append(char)
+                            continue
+
+                        # Render the character and check if it's actually visible
+                        char_img = Image.new('L', (100, 50), 255)
+                        char_draw = ImageDraw.Draw(char_img)
+                        char_draw.text((10, 10), char, font=pil_font, fill=0)
+                        char_bbox = char_img.getbbox()
+                        
+                        # If getbbox() returns None, the glyph is empty/invisible
+                        if char_bbox is None:
+                            cannot_render.append(char)
+                            continue
+                        
+                        # Compare with .notdef to detect placeholder glyphs
+                        if notdef_bytes:
+                            char_bytes = char_img.crop(char_bbox).tobytes()
+                            # If identical to .notdef, the glyph doesn't really exist
+                            if char_bytes == notdef_bytes:
+                                cannot_render.append(char)
 
                     except Exception:
                         cannot_render.append(char)
 
                 if cannot_render:
-                    return False, f"Cannot render: {', '.join(cannot_render)}"
+                    return False, f"Cannot render (missing/empty glyph): {', '.join(cannot_render)}"
 
             except Exception as e:
                 return False, f"PIL rendering error: {str(e)}"

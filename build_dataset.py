@@ -4,6 +4,7 @@ Generador de dataset sintético de texto manuscrito multilingüe
 Usa textos de /data/ y fuentes de /fonts/ para crear imágenes de líneas y palabras
 Soporta fondos de papel realistas desde /backgrounds/
 Fondos organizados por tipo (plain, grid, lined) y color (white, grey, beige)
+Soporta perturbaciones realistas para simular documentos escaneados/fotografiados
 """
 
 import os
@@ -19,6 +20,9 @@ import multiprocessing as mp
 from functools import partial
 import platform
 
+# Import perturbation module
+from apply_perturbations import PerturbationPipeline, QualityLevel
+
 
 # ============================================================================
 # FUNCIONES GLOBALES PARA MULTIPROCESSING
@@ -28,6 +32,9 @@ def _generate_single_image(task, target_height=128):
     """
     Función worker para generar una imagen (compatible con multiprocessing)
     """
+    # Marge horitzontal (píxels a cada costat)
+    HORIZONTAL_MARGIN = 20
+    
     try:
         text = task['text']
         font_path = task['font_path']
@@ -54,8 +61,8 @@ def _generate_single_image(task, target_height=128):
             text_width = bbox[2] - bbox[0]
             text_height = bbox[3] - bbox[1]
 
-        # Crear imagen: altura fija, ancho variable
-        img_width = max(text_width, 10)
+        # Crear imagen: altura fija, ancho variable + marges
+        img_width = max(text_width, 10) + 2 * HORIZONTAL_MARGIN
         img_height = target_height
 
         # Crear imagen con fondo o blanco
@@ -95,7 +102,16 @@ def _generate_single_image(task, target_height=128):
         ink_r = random.randint(0, 30)
         ink_g = random.randint(0, 30)
         ink_b = random.randint(0, 40)
-        draw.text((0, y), text, font=font, fill=(ink_r, ink_g, ink_b))
+        draw.text((HORIZONTAL_MARGIN, y), text, font=font, fill=(ink_r, ink_g, ink_b))
+
+        # Aplicar perturbaciones si están habilitadas
+        perturb_metadata = {'quality': 'clean'}
+        perturbation_config = task.get('perturbation_config')
+        if perturbation_config and perturbation_config.get('enabled'):
+            quality_dist = perturbation_config.get('quality_distribution', (40, 40, 20))
+            pipeline = PerturbationPipeline(quality_distribution=quality_dist)
+            img, perturb_params = pipeline.apply(img)
+            perturb_metadata = perturb_params.to_dict()
 
         # Guardar imagen
         img_path = split_dir / img_filename
@@ -112,8 +128,14 @@ def _generate_single_image(task, target_height=128):
             'background_type': bg_type,
             'background_color': bg_color,
             'mode': task['mode'],
-            'split_name': task['split_name']
+            'split_name': task['split_name'],
+            'quality': perturb_metadata.get('quality', 'clean'),
         }
+        
+        # Afegir paràmetres de pertorbació si n'hi ha
+        perturbation_params = {k: v for k, v in perturb_metadata.items() if k != 'quality' and v is not None}
+        if perturbation_params:
+            metadata_entry['perturbations'] = perturbation_params
 
         return metadata_entry
 
@@ -130,7 +152,8 @@ class SyntheticDatasetBuilder:
                  mode='lines', style='normal', verbose=False,
                  train_split=0.8, val_split=0.1, num_workers=1, max_fonts_per_category=None,
                  category_filter=None, backgrounds_dir=None,
-                 background_color=None, background_type=None):
+                 background_color=None, background_type=None,
+                 perturbations=False, quality_distribution=(40, 40, 20)):
         self.data_dir = Path(data_dir)
         self.fonts_dir = Path(fonts_dir)
         self.output_dir = Path(output_dir)
@@ -142,6 +165,14 @@ class SyntheticDatasetBuilder:
         self.category_filter = category_filter
         self.background_color = background_color
         self.background_type = background_type
+        
+        # Perturbation settings
+        self.perturbations_enabled = perturbations
+        self.quality_distribution = quality_distribution
+        if self.perturbations_enabled:
+            self.perturbation_pipeline = PerturbationPipeline(
+                quality_distribution=quality_distribution
+            )
 
         # Cargar fondos
         self.backgrounds_dir = Path(backgrounds_dir) if backgrounds_dir else None
@@ -173,7 +204,10 @@ class SyntheticDatasetBuilder:
             'words_generated': 0,
             'train_samples': 0,
             'val_samples': 0,
-            'test_samples': 0
+            'test_samples': 0,
+            'quality_clean': 0,
+            'quality_degraded': 0,
+            'quality_severe': 0,
         }
 
         self.fonts = []
@@ -339,32 +373,24 @@ class SyntheticDatasetBuilder:
     def load_texts(self):
         """Carga todos los textos del directorio data"""
         print("\n[2] Cargando textos...")
-
         txt_sources = []
-
         for txt_file in self.data_dir.glob('*.txt'):
             txt_sources.append((txt_file, self.data_dir.name))
-
         for book_dir in self.data_dir.iterdir():
             if not book_dir.is_dir():
                 continue
             for txt_file in book_dir.glob('*.txt'):
                 txt_sources.append((txt_file, book_dir.name))
-
         for txt_file, book_name in txt_sources:
             try:
                 with open(txt_file, 'r', encoding='utf-8') as f:
                     content = f.read()
-
                 content = content.replace('\n', ' ')
                 content = re.sub(r'\s+', ' ', content)
-
                 sentences = re.split(r'(?<=[.!?;:])\s+', content)
-
                 for sentence in sentences:
                     sentence = sentence.strip()
                     words = sentence.split()
-
                     if 3 <= len(words) <= 15 and any(c.isalpha() for c in sentence):
                         self.texts.append({
                             'text': sentence,
@@ -382,38 +408,42 @@ class SyntheticDatasetBuilder:
                                     'book': book_name,
                                     'file': txt_file.name
                                 })
-
             except Exception as e:
                 if self.verbose:
                     print(f"  [ERROR] Error leyendo {txt_file}: {e}")
-
         print(f"  [OK] {len(self.texts)} frases cargadas")
 
     def generate_image(self, text, font_info, target_height=128):
-        """Genera una imagen de texto con fondo de papel"""
+        """Genera una imagen con el texto y la fuente especificada"""
+        # Marge horitzontal (píxels a cada costat)
+        HORIZONTAL_MARGIN = 20
+        
         try:
+            font_path = font_info['path']
             font_size = int(target_height * 0.7)
-            font = ImageFont.truetype(str(font_info['path']), font_size)
+            font = ImageFont.truetype(str(font_path), font_size)
 
+            # Medir texto
             temp_img = Image.new('RGB', (1, 1), 'white')
             temp_draw = ImageDraw.Draw(temp_img)
             bbox = temp_draw.textbbox((0, 0), text, font=font)
             text_width = bbox[2] - bbox[0]
             text_height = bbox[3] - bbox[1]
 
+            # Ajustar font_size para alcanzar target_height
             if text_height > 0:
                 scale_factor = (target_height * 0.8) / text_height
                 font_size = int(font_size * scale_factor)
-                font = ImageFont.truetype(str(font_info['path']), font_size)
+                font = ImageFont.truetype(str(font_path), font_size)
                 bbox = temp_draw.textbbox((0, 0), text, font=font)
                 text_width = bbox[2] - bbox[0]
                 text_height = bbox[3] - bbox[1]
 
-            img_width = max(text_width, 10)
+            # Crear imagen: altura fija, ancho variable + marges
+            img_width = max(text_width, 10) + 2 * HORIZONTAL_MARGIN
             img_height = target_height
 
-            bg_type = 'plain'
-            bg_color = 'white'
+            # Crear imagen con fondo o blanco
             if self.backgrounds:
                 bg_info = random.choice(self.backgrounds)
                 try:
@@ -434,15 +464,23 @@ class SyntheticDatasetBuilder:
                     bg_color = bg_info['color']
                 except Exception:
                     img = Image.new('RGB', (img_width, img_height), 'white')
+                    bg_type = 'plain'
+                    bg_color = 'white'
             else:
                 img = Image.new('RGB', (img_width, img_height), 'white')
+                bg_type = 'plain'
+                bg_color = 'white'
 
             draw = ImageDraw.Draw(img)
+
+            # Centrar texto verticalmente
             y = (target_height - text_height) // 2 - bbox[1]
+
+            # Color de tinta con ligera variación
             ink_r = random.randint(0, 30)
             ink_g = random.randint(0, 30)
             ink_b = random.randint(0, 40)
-            draw.text((0, y), text, font=font, fill=(ink_r, ink_g, ink_b))
+            draw.text((HORIZONTAL_MARGIN, y), text, font=font, fill=(ink_r, ink_g, ink_b))
 
             return img, bg_type, bg_color
 
@@ -472,6 +510,10 @@ class SyntheticDatasetBuilder:
         else:
             print(f"  [INFO] Fondos: blanco (sin backgrounds/)")
         print(f"  [INFO] Splits: train={self.train_split:.0%}, val={self.val_split:.0%}, test={self.test_split:.0%}")
+        if self.perturbations_enabled:
+            print(f"  [INFO] Perturbaciones: ON (distribución: {self.quality_distribution[0]}% clean, {self.quality_distribution[1]}% degraded, {self.quality_distribution[2]}% severe)")
+        else:
+            print(f"  [INFO] Perturbaciones: OFF")
         if self.num_workers > 1:
             print(f"  [INFO] Usando {self.num_workers} workers en paralelo")
 
@@ -517,6 +559,12 @@ class SyntheticDatasetBuilder:
         print(f"    Train: {self.stats['train_samples']:,}")
         print(f"    Validation: {self.stats['val_samples']:,}")
         print(f"    Test: {self.stats['test_samples']:,}")
+        
+        if self.perturbations_enabled:
+            print(f"\n  Distribución de calidad:")
+            print(f"    Clean: {self.stats['quality_clean']:,}")
+            print(f"    Degraded: {self.stats['quality_degraded']:,}")
+            print(f"    Severe: {self.stats['quality_severe']:,}")
 
     def _generate_dataset_parallel(self, train_texts, val_texts, test_texts,
                                     train_metadata, val_metadata, test_metadata,
@@ -524,6 +572,12 @@ class SyntheticDatasetBuilder:
         """Genera dataset usando multiprocessing"""
         tasks = []
         counters = {'train': 0, 'validation': 0, 'test': 0}
+        
+        # Configuració de pertorbacions per passar als workers
+        perturbation_config = {
+            'enabled': self.perturbations_enabled,
+            'quality_distribution': self.quality_distribution
+        } if self.perturbations_enabled else None
 
         for font_info in self.fonts:
             for split_name, split_texts, split_dir in [
@@ -565,7 +619,8 @@ class SyntheticDatasetBuilder:
                             },
                             'background': bg_data,
                             'mode': self.mode,
-                            'split_name': split_name
+                            'split_name': split_name,
+                            'perturbation_config': perturbation_config
                         }
                         tasks.append(task)
 
@@ -593,6 +648,14 @@ class SyntheticDatasetBuilder:
             for result in pool.imap_unordered(worker_fn, tasks, chunksize=optimal_chunksize):
                 if result is not None:
                     results.append(result)
+                    # Comptabilitzar qualitat
+                    quality = result.get('quality', 'clean')
+                    if quality == 'clean':
+                        self.stats['quality_clean'] += 1
+                    elif quality == 'degraded':
+                        self.stats['quality_degraded'] += 1
+                    elif quality == 'severe':
+                        self.stats['quality_severe'] += 1
                 processed += 1
                 if processed % report_interval == 0 or processed == len(tasks):
                     percent = (processed / len(tasks)) * 100
@@ -651,6 +714,21 @@ class SyntheticDatasetBuilder:
 
                             img, bg_type, bg_color = img_result
 
+                            # Aplicar perturbaciones si están habilitadas
+                            perturb_metadata = {'quality': 'clean'}
+                            if self.perturbations_enabled:
+                                img, perturb_params = self.perturbation_pipeline.apply(img)
+                                perturb_metadata = perturb_params.to_dict()
+                                
+                                # Comptabilitzar qualitat
+                                quality = perturb_metadata.get('quality', 'clean')
+                                if quality == 'clean':
+                                    self.stats['quality_clean'] += 1
+                                elif quality == 'degraded':
+                                    self.stats['quality_degraded'] += 1
+                                elif quality == 'severe':
+                                    self.stats['quality_severe'] += 1
+
                             if split_name == 'train':
                                 img_filename = f"{global_train_count:08d}.png"
                                 global_train_count += 1
@@ -676,8 +754,14 @@ class SyntheticDatasetBuilder:
                                 'source_book': text_data['book'],
                                 'background_type': bg_type,
                                 'background_color': bg_color,
-                                'mode': self.mode
+                                'mode': self.mode,
+                                'quality': perturb_metadata.get('quality', 'clean'),
                             }
+                            
+                            # Afegir paràmetres de pertorbació si n'hi ha
+                            perturbation_params = {k: v for k, v in perturb_metadata.items() if k != 'quality' and v is not None}
+                            if perturbation_params:
+                                metadata_entry['perturbations'] = perturbation_params
 
                             split_metadata.append(metadata_entry)
                             self.stats['images_generated'] += 1
@@ -712,7 +796,7 @@ class SyntheticDatasetBuilder:
 
         dataset_info = {
             'description': 'Synthetic multilingual handwriting dataset',
-            'version': '2.0.0',
+            'version': '2.1.0',
             'splits': {
                 'train': {'name': 'train', 'num_samples': self.stats['train_samples']},
                 'validation': {'name': 'validation', 'num_samples': self.stats['val_samples']},
@@ -727,7 +811,8 @@ class SyntheticDatasetBuilder:
                 'source_book': {'dtype': 'string'},
                 'background_type': {'dtype': 'string'},
                 'background_color': {'dtype': 'string'},
-                'mode': {'dtype': 'string'}
+                'mode': {'dtype': 'string'},
+                'quality': {'dtype': 'string'},
             },
             'mode': self.mode,
             'style': self.style,
@@ -735,8 +820,17 @@ class SyntheticDatasetBuilder:
             'num_fonts': len(self.fonts),
             'num_backgrounds': len(self.backgrounds),
             'background_types': bg_types,
-            'background_colors': bg_colors
+            'background_colors': bg_colors,
+            'perturbations_enabled': self.perturbations_enabled,
         }
+        
+        if self.perturbations_enabled:
+            dataset_info['quality_distribution'] = {
+                'clean': self.stats['quality_clean'],
+                'degraded': self.stats['quality_degraded'],
+                'severe': self.stats['quality_severe']
+            }
+            dataset_info['features']['perturbations'] = {'dtype': 'dict'}
 
         dataset_info_path = self.output_dir / 'dataset_info.json'
         with open(dataset_info_path, 'w', encoding='utf-8') as f:
@@ -766,6 +860,16 @@ class SyntheticDatasetBuilder:
                 print(f"  {name}: {bg_summary[name]}")
         else:
             print(f"  Blanco (sin fondos)")
+        print(f"\nPerturbaciones:")
+        if self.perturbations_enabled:
+            print(f"  Estado: ACTIVADAS")
+            print(f"  Distribución configurada: {self.quality_distribution[0]}% clean, {self.quality_distribution[1]}% degraded, {self.quality_distribution[2]}% severe")
+            print(f"  Resultados:")
+            print(f"    Clean: {self.stats['quality_clean']:,}")
+            print(f"    Degraded: {self.stats['quality_degraded']:,}")
+            print(f"    Severe: {self.stats['quality_severe']:,}")
+        else:
+            print(f"  Estado: DESACTIVADAS")
         print(f"\nImágenes generadas:")
         print(f"  Total: {self.stats['images_generated']:,}")
         if self.mode == 'words':
@@ -823,6 +927,13 @@ def main():
                         help='Filtrar por color de fondo, separados por comas (ex: white,grey,beige). Por defecto usa todos')
     parser.add_argument('--background-type', type=str, default=None,
                         help='Filtrar por tipo de fondo, separados por comas (ex: plain,grid,lined). Por defecto usa todos')
+    
+    # Perturbation arguments
+    parser.add_argument('--perturbations', action='store_true',
+                        help='Aplicar perturbaciones realistas a las imágenes (blur, rotación, ruido, etc.)')
+    parser.add_argument('--quality-distribution', type=str, default='40,40,20',
+                        help='Distribución de calidad: clean,degraded,severe en porcentajes (default: 40,40,20)')
+    
     parser.add_argument('--verbose', '-v', action='store_true',
                         help='Mostrar información detallada')
 
@@ -840,6 +951,12 @@ def main():
         output_dir = args.output_dir
 
     backgrounds_dir = args.backgrounds_dir if args.backgrounds_dir != 'none' else None
+    
+    # Parse quality distribution
+    quality_dist = tuple(map(int, args.quality_distribution.split(',')))
+    if len(quality_dist) != 3 or sum(quality_dist) != 100:
+        print(f"[ERROR] --quality-distribution debe tener 3 valores que sumen 100 (ej: 40,40,20)")
+        return
 
     print("=" * 60)
     print("GENERADOR DE DATASET SINTÉTICO - FORMATO HUGGINGFACE")
@@ -855,6 +972,8 @@ def main():
             print(f"  Color: {args.background_color}")
         if args.background_type:
             print(f"  Tipo: {args.background_type}")
+    if args.perturbations:
+        print(f"Perturbaciones: ON ({quality_dist[0]}% clean, {quality_dist[1]}% degraded, {quality_dist[2]}% severe)")
     print()
 
     builder = SyntheticDatasetBuilder(
@@ -871,6 +990,8 @@ def main():
         backgrounds_dir=backgrounds_dir,
         background_color=args.background_color,
         background_type=args.background_type,
+        perturbations=args.perturbations,
+        quality_distribution=quality_dist,
         verbose=args.verbose
     )
 

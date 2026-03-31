@@ -1,0 +1,5 @@
+{
+  "language": "estonian",
+  "code": "et",
+  "required_chars": ["ä", "ö", "ü", "õ", "Ä", "Ö", "Ü", "Õ"]
+}

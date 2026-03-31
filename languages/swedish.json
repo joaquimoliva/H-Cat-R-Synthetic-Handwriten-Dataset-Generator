@@ -1,0 +1,5 @@
+{
+  "language": "swedish",
+  "code": "sv",
+  "required_chars": ["å", "ä", "ö", "Å", "Ä", "Ö"]
+}

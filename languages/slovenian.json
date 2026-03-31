@@ -1,0 +1,5 @@
+{
+  "language": "slovenian",
+  "code": "sl",
+  "required_chars": ["č", "š", "ž", "Č", "Š", "Ž"]
+}

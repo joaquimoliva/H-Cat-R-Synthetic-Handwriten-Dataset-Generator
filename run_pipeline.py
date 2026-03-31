@@ -9,6 +9,9 @@ Executa tots els passos en ordre amb una sola comanda.
 Ús amb tots els paràmetres:
     python run_pipeline.py --language catalan --max-articles 100 --font-pages 10 --mode lines --category-filter Handwritten --background-color white,grey --background-type lined,grid --workers -1 -v
 
+Amb pertorbacions:
+    python run_pipeline.py --language catalan --perturbations --quality-distribution 40,40,20 -v
+
 Saltar passos:
     python run_pipeline.py --language catalan --skip-text --skip-fonts -v
 """
@@ -68,8 +71,11 @@ Exemples:
   # Amb filtres de fons
   python run_pipeline.py --language catalan --background-color grey --background-type lined --skip-text --skip-fonts -v
 
-  # Només paper blanc pautat
-  python run_pipeline.py --language catalan --background-color white --background-type lined --skip-text --skip-fonts -v
+  # Amb pertorbacions realistes
+  python run_pipeline.py --language catalan --perturbations --quality-distribution 40,40,20 -v
+
+  # Més imatges degradades (entrenament robust)
+  python run_pipeline.py --language catalan --perturbations --quality-distribution 20,50,30 -v
 
   # Sense fons (només blanc llis)
   python run_pipeline.py --language catalan --no-backgrounds --skip-text --skip-fonts -v
@@ -113,6 +119,12 @@ Exemples:
     parser.add_argument('--no-backgrounds', action='store_true',
                         help='Desactivar fons de paper (només blanc llis)')
 
+    # Paràmetres de pertorbacions
+    parser.add_argument('--perturbations', action='store_true',
+                        help='Aplicar pertorbacions realistes (blur, rotació, soroll, etc.)')
+    parser.add_argument('--quality-distribution', type=str, default='40,40,20',
+                        help='Distribució de qualitat: clean,degraded,severe en %% (default: 40,40,20)')
+
     # Paràmetres de generació
     parser.add_argument('--mode', choices=['lines', 'words'], default='lines',
                         help='Mode de generació: lines o words (default: lines)')
@@ -130,6 +142,20 @@ Exemples:
                         help='Nom personalitzat per la carpeta output')
 
     args = parser.parse_args()
+
+    # Validar quality-distribution
+    quality_dist = args.quality_distribution.split(',')
+    if len(quality_dist) != 3:
+        print(f"[ERROR] --quality-distribution ha de tenir 3 valors separats per comes (ex: 40,40,20)")
+        sys.exit(1)
+    try:
+        quality_values = [int(x) for x in quality_dist]
+        if sum(quality_values) != 100:
+            print(f"[ERROR] --quality-distribution ha de sumar 100 (actual: {sum(quality_values)})")
+            sys.exit(1)
+    except ValueError:
+        print(f"[ERROR] --quality-distribution ha de contenir números enters")
+        sys.exit(1)
 
     # Carregar configuració de l'idioma
     lang_config = load_language_config(args.language)
@@ -149,6 +175,10 @@ Exemples:
         bg_type_str = args.background_type if args.background_type else "tots"
         print(f"  Fons color: {bg_color_str}")
         print(f"  Fons tipus: {bg_type_str}")
+    if args.perturbations:
+        print(f"  Pertorbacions: ON ({args.quality_distribution} clean/degraded/severe)")
+    else:
+        print(f"  Pertorbacions: OFF")
     if args.skip_text:
         print(f"  [SKIP] Descàrrega de textos")
     if args.skip_fonts:
@@ -209,8 +239,6 @@ Exemples:
         # PAS 3: Descarregar fonts
         # ============================================================
         csv_file = 'compatible_fonts.csv'
-        if not Path(csv_file).exists():
-            csv_file = 'catalan_fonts.csv'
 
         if Path(csv_file).exists():
             cmd = [
@@ -218,16 +246,9 @@ Exemples:
                 csv_file,
                 '--skip-existing',
             ]
-
-            success = run_step(
-                "3/6 - Descarregar fonts",
-                cmd, args.verbose
-            )
-            if not success:
-                print("\n[ABORT] Pipeline aturat per error al pas 3")
-                sys.exit(1)
+            # ...
         else:
-            print(f"\n[WARNING] No s'ha trobat el fitxer CSV de fonts")
+            print(f"\n[WARNING] No s'ha trobat {csv_file}")
 
         # ============================================================
         # PAS 4: Verificar i netejar fonts
@@ -312,6 +333,11 @@ Exemples:
             if args.background_type:
                 cmd.extend(['--background-type', args.background_type])
 
+        # Pertorbacions
+        if args.perturbations:
+            cmd.append('--perturbations')
+            cmd.extend(['--quality-distribution', args.quality_distribution])
+
         success = run_step(
             "6/6 - Generar dataset sintètic",
             cmd, args.verbose
@@ -332,6 +358,8 @@ Exemples:
     print(f"  Textos: data/wikipedia_{lang_code}/")
     print(f"  Fonts: fonts/")
     print(f"  Fons: {'desactivats' if args.no_backgrounds else 'backgrounds/'}")
+    if args.perturbations:
+        print(f"  Pertorbacions: {args.quality_distribution} (clean/degraded/severe)")
     output_dir = f"output_{args.output_name}" if args.output_name else "output"
     print(f"  Dataset: {output_dir}/")
     print("=" * 60)

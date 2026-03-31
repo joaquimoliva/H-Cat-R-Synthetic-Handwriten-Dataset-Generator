@@ -2,18 +2,201 @@
 FONT VERIFICATION REPORT
 ============================================================
 
-Total fonts checked: 115
-Valid fonts: 114
-Invalid fonts: 1
+Total fonts checked: 265
+Valid fonts: 219
+Invalid fonts: 46
 
 ============================================================
 INVALID FONTS DETAILS
 ============================================================
 
 
-Handwritten (1 fonts)
+Handwritten (12 fonts)
 ------------------------------------------------------------
+  Font: Allura_Script
+  Path: Handwritten\Allura_Script\Allura_Script.ttf
+  Reason: Missing in cmap: %
+
   Font: Amertha
   Path: Handwritten\Amertha\Amertha_PERSONAL_USE_ONLY.ttf
-  Reason: Too many identical glyphs (96%): likely embedded logo
+  Reason: Cannot render (missing/empty glyph): 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, ., ,, :, ;, !, ?, ', ", (, ), [, ], -, %, &, @, /, +, =, €, $, à, è, é, í, ï, ò, ó, ú, ü, ç, ·
+
+  Font: A_Glitch_In_Time
+  Path: Handwritten\A_Glitch_In_Time\A Glitch In Time.otf
+  Reason: Cannot render (missing/empty glyph): €
+
+  Font: A_Glitch_In_Time
+  Path: Handwritten\A_Glitch_In_Time\A Glitch In Time.ttf
+  Reason: Cannot render (missing/empty glyph): €
+
+  Font: Breathing
+  Path: Handwritten\Breathing\Breathing Personal Use Only.ttf
+  Reason: Cannot render (missing/empty glyph): ., ,
+
+  Font: Honey_Script
+  Path: Handwritten\Honey_Script\HoneyScript-Light.ttf
+  Reason: Missing in cmap: %, €
+
+  Font: Honey_Script
+  Path: Handwritten\Honey_Script\HoneyScript-SemiBold.ttf
+  Reason: Missing in cmap: %, €
+
+  Font: KG_Happy_Lauren
+  Path: Handwritten\KG_Happy_Lauren\KGHappyLauren.otf
+  Reason: Missing in cmap: €
+
+  Font: KG_Happy_Lauren
+  Path: Handwritten\KG_Happy_Lauren\KGHappyLauren.ttf
+  Reason: Missing in cmap: €
+
+  Font: Sweet_Purple
+  Path: Handwritten\Sweet_Purple\sweet purple.otf
+  Reason: Cannot render (missing/empty glyph): €
+
+  Font: Sweet_Purple
+  Path: Handwritten\Sweet_Purple\sweet purple.ttf
+  Reason: Cannot render (missing/empty glyph): €
+
+  Font: TrashHand
+  Path: Handwritten\TrashHand\TrashHand.TTF
+  Reason: Missing in cmap: €
+
+
+School (34 fonts)
+------------------------------------------------------------
+  Font: Arsenale_White
+  Path: School\Arsenale_White\Arsenale White-trial.ttf
+  Reason: Missing in cmap: %
+
+  Font: Cole_Carreira
+  Path: School\Cole_Carreira\ColeCarreira.ttf
+  Reason: Missing in cmap: [, ], @, €
+
+  Font: Crayon,_Plume,_Seyes
+  Path: School\Crayon,_Plume,_Seyes\CrayonE.ttf
+  Reason: Missing in cmap: €
+
+  Font: Crayon,_Plume,_Seyes
+  Path: School\Crayon,_Plume,_Seyes\CrayonL.ttf
+  Reason: Missing in cmap: €
+
+  Font: Crayon,_Plume,_Seyes
+  Path: School\Crayon,_Plume,_Seyes\PlumBAE.ttf
+  Reason: Missing in cmap: €
+
+  Font: Crayon,_Plume,_Seyes
+  Path: School\Crayon,_Plume,_Seyes\PlumBAL.ttf
+  Reason: Missing in cmap: €
+
+  Font: Crayon,_Plume,_Seyes
+  Path: School\Crayon,_Plume,_Seyes\PlumBDE.ttf
+  Reason: Missing in cmap: €
+
+  Font: Crayon,_Plume,_Seyes
+  Path: School\Crayon,_Plume,_Seyes\PlumBDL.ttf
+  Reason: Missing in cmap: €
+
+  Font: Crayon,_Plume,_Seyes
+  Path: School\Crayon,_Plume,_Seyes\PlumNAE.ttf
+  Reason: Missing in cmap: €
+
+  Font: Crayon,_Plume,_Seyes
+  Path: School\Crayon,_Plume,_Seyes\PlumNAL.ttf
+  Reason: Missing in cmap: €
+
+  Font: Crayon,_Plume,_Seyes
+  Path: School\Crayon,_Plume,_Seyes\PlumNDE.ttf
+  Reason: Missing in cmap: €
+
+  Font: Crayon,_Plume,_Seyes
+  Path: School\Crayon,_Plume,_Seyes\PlumNDL.ttf
+  Reason: Missing in cmap: €
+
+  Font: Crayon,_Plume,_Seyes
+  Path: School\Crayon,_Plume,_Seyes\SeyesBDE.ttf
+  Reason: Missing in cmap: €
+
+  Font: Crayon,_Plume,_Seyes
+  Path: School\Crayon,_Plume,_Seyes\SeyesBDL.ttf
+  Reason: Missing in cmap: €
+
+  Font: Crayon,_Plume,_Seyes
+  Path: School\Crayon,_Plume,_Seyes\SeyesNDE.ttf
+  Reason: Missing in cmap: €
+
+  Font: Crayon,_Plume,_Seyes
+  Path: School\Crayon,_Plume,_Seyes\SeyesNDL.ttf
+  Reason: Missing in cmap: €
+
+  Font: Cursif
+  Path: School\Cursif\Cursif.ttf
+  Reason: Missing in cmap: €
+
+  Font: Cursif
+  Path: School\Cursif\Cursifl.ttf
+  Reason: Missing in cmap: €
+
+  Font: DuCahier
+  Path: School\DuCahier\TASSELXP.TTF
+  Reason: Missing in cmap: €
+
+  Font: Ecolier
+  Path: School\Ecolier\ec.TTF
+  Reason: Missing in cmap: €
+
+  Font: Ecolier
+  Path: School\Ecolier\ecl.TTF
+  Reason: Missing in cmap: €
+
+  Font: Ecolier
+  Path: School\Ecolier\ecl_cour.TTF
+  Reason: Missing in cmap: €
+
+  Font: Ecolier
+  Path: School\Ecolier\ec_cour.TTF
+  Reason: Missing in cmap: €
+
+  Font: Ecolier
+  Path: School\Ecolier\ec_co_pt.TTF
+  Reason: Missing in cmap: €
+
+  Font: Ecolier
+  Path: School\Ecolier\ec_cp.TTF
+  Reason: Missing in cmap: €
+
+  Font: Gruenewald_VA
+  Path: School\Gruenewald_VA\Gruenewald VA normal.ttf
+  Reason: Missing in cmap: [, ]
+
+  Font: Imrans_School
+  Path: School\Imrans_School\Imrans School a.ttf
+  Reason: Missing in cmap: €
+
+  Font: Imrans_School
+  Path: School\Imrans_School\Imrans School b.ttf
+  Reason: Missing in cmap: €
+
+  Font: Imrans_School
+  Path: School\Imrans_School\Imrans School2 a.ttf
+  Reason: Missing in cmap: €
+
+  Font: Imrans_School
+  Path: School\Imrans_School\Imrans School2 b.ttf
+  Reason: Missing in cmap: €
+
+  Font: Letters_for_Learners
+  Path: School\Letters_for_Learners\Letters for Learners Dots.ttf
+  Reason: Cannot render (missing/empty glyph): .
+
+  Font: Letters_for_Learners
+  Path: School\Letters_for_Learners\Letters for Learners Outline Bold.ttf
+  Reason: Cannot render (missing/empty glyph): ?, @
+
+  Font: Letters_for_Learners
+  Path: School\Letters_for_Learners\Letters for Learners Outline Light.ttf
+  Reason: Cannot render (missing/empty glyph): ?
+
+  Font: School_Script_Dashed
+  Path: School\School_Script_Dashed\SchoolScriptDashed.ttf
+  Reason: Missing in cmap: €
 

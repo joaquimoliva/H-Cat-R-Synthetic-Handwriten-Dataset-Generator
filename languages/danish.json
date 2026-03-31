@@ -1,0 +1,5 @@
+{
+  "language": "danish",
+  "code": "da",
+  "required_chars": ["æ", "ø", "å", "Æ", "Ø", "Å"]
+}
