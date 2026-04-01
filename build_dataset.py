@@ -19,9 +19,53 @@ from tqdm import tqdm
 import multiprocessing as mp
 from functools import partial
 import platform
+from fontTools.ttLib import TTFont
 
 # Import perturbation module
 from apply_perturbations import PerturbationPipeline, QualityLevel
+
+
+# ============================================================================
+# FUNCIONES DE VERIFICACIÓN DE FUENTES
+# ============================================================================
+
+def _font_supports_text(font_path, text):
+    """
+    Verifica si una fuente soporta todos los caracteres de un texto.
+    Retorna True si soporta todos, False si falta alguno.
+    """
+    try:
+        font = TTFont(font_path)
+        cmap = font.getBestCmap()
+        if cmap is None:
+            return False
+        
+        for char in text:
+            if char.isspace():
+                continue  # Ignorar espacios
+            codepoint = ord(char)
+            if codepoint not in cmap:
+                return False
+        return True
+    except Exception:
+        return False
+
+
+# Cache global para evitar recargar fonts
+_font_support_cache = {}
+
+def _check_font_supports_text_cached(font_path, text):
+    """
+    Versión con caché de la verificación de soporte de caracteres.
+    """
+    # Crear una clave única para el conjunto de caracteres únics del text
+    unique_chars = ''.join(sorted(set(c for c in text if not c.isspace())))
+    cache_key = (font_path, unique_chars)
+    
+    if cache_key not in _font_support_cache:
+        _font_support_cache[cache_key] = _font_supports_text(font_path, unique_chars)
+    
+    return _font_support_cache[cache_key]
 
 
 # ============================================================================
@@ -32,15 +76,20 @@ def _generate_single_image(task, target_height=128):
     """
     Función worker para generar una imagen (compatible con multiprocessing)
     """
-    # Marge horitzontal (píxels a cada costat)
+    # Marges (píxels a cada costat)
     HORIZONTAL_MARGIN = 20
+    VERTICAL_MARGIN = 10
     
     try:
         text = task['text']
         font_path = task['font_path']
         split_dir = Path(task['split_dir'])
         img_filename = task['img_filename']
-
+        
+        # Verificar que la font suporta tots els caràcters del text
+        if not _check_font_supports_text_cached(font_path, text):
+            return None  # Saltar aquesta combinació
+        
         # Generar imagen
         font_size = int(target_height * 0.7)
         font = ImageFont.truetype(str(font_path), font_size)
@@ -52,9 +101,10 @@ def _generate_single_image(task, target_height=128):
         text_width = bbox[2] - bbox[0]
         text_height = bbox[3] - bbox[1]
 
-        # Ajustar font_size para alcanzar target_height
+        # Ajustar font_size para alcanzar target_height (deixant espai pels marges)
+        available_height = target_height - 2 * VERTICAL_MARGIN
         if text_height > 0:
-            scale_factor = (target_height * 0.8) / text_height
+            scale_factor = (available_height * 0.9) / text_height
             font_size = int(font_size * scale_factor)
             font = ImageFont.truetype(str(font_path), font_size)
             bbox = temp_draw.textbbox((0, 0), text, font=font)
@@ -95,7 +145,7 @@ def _generate_single_image(task, target_height=128):
 
         draw = ImageDraw.Draw(img)
 
-        # Centrar texto verticalmente
+        # Centrar texto verticalment
         y = (target_height - text_height) // 2 - bbox[1]
 
         # Color de tinta con ligera variación
@@ -121,6 +171,8 @@ def _generate_single_image(task, target_height=128):
         metadata_entry = {
             'file_name': img_filename,
             'text': text,
+            'text_length': len(text),
+            'language': task.get('language', 'unknown'),
             'font_name': task['font_info']['name'],
             'font_category': task['font_info']['category'],
             'font_style': task['font_info']['style'],
@@ -147,14 +199,70 @@ def _generate_single_image(task, target_height=128):
         return None
 
 
+def _load_required_chars_for_languages(languages_str):
+    """
+    Carrega els caràcters requerits per a tots els idiomes especificats.
+    Retorna un conjunt amb tots els caràcters únics necessaris.
+    """
+    required_chars = set()
+    
+    # Caràcters base (comuns a tots els idiomes)
+    base_chars = set('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789')
+    base_chars.update('.,;:!?\'"-()[]{}')
+    required_chars.update(base_chars)
+    
+    # Parsejar idiomes
+    if ',' in languages_str:
+        languages = [l.strip() for l in languages_str.split(',')]
+    else:
+        languages = [languages_str]
+    
+    # Carregar caràcters específics de cada idioma
+    for lang in languages:
+        lang_file = Path('languages') / f'{lang}.json'
+        if lang_file.exists():
+            try:
+                with open(lang_file, 'r', encoding='utf-8') as f:
+                    config = json.load(f)
+                    lang_chars = config.get('required_chars', [])
+                    required_chars.update(lang_chars)
+            except Exception:
+                pass
+    
+    return required_chars
+
+
+def _font_supports_chars(font_path, required_chars):
+    """
+    Verifica si una font suporta tots els caràcters requerits.
+    """
+    try:
+        font = TTFont(font_path)
+        cmap = font.getBestCmap()
+        if cmap is None:
+            return False
+        
+        for char in required_chars:
+            if char.isspace():
+                continue
+            codepoint = ord(char)
+            if codepoint not in cmap:
+                return False
+        return True
+    except Exception:
+        return False
+
+
 class SyntheticDatasetBuilder:
     def __init__(self, data_dir='data', fonts_dir='fonts', output_dir='output',
                  mode='lines', style='normal', verbose=False,
                  train_split=0.8, val_split=0.1, num_workers=1, max_fonts_per_category=None,
                  category_filter=None, backgrounds_dir=None,
                  background_color=None, background_type=None,
-                 perturbations=False, quality_distribution=(40, 40, 20)):
-        self.data_dir = Path(data_dir)
+                 perturbations=False, quality_distribution=(40, 40, 20),
+                 language='unknown'):
+        # Guardar data_dir com a string (pot contenir múltiples directoris separats per comes)
+        self.data_dir = data_dir
         self.fonts_dir = Path(fonts_dir)
         self.output_dir = Path(output_dir)
         self.mode = mode
@@ -165,6 +273,18 @@ class SyntheticDatasetBuilder:
         self.category_filter = category_filter
         self.background_color = background_color
         self.background_type = background_type
+        self.language = language
+        
+        # Parsejar idiomes
+        if ',' in language:
+            self.languages = [l.strip() for l in language.split(',')]
+        else:
+            self.languages = [language]
+        
+        # Carregar caràcters requerits PER CADA idioma (no combinats)
+        self.required_chars_by_lang = {}
+        for lang in self.languages:
+            self.required_chars_by_lang[lang] = _load_required_chars_for_languages(lang)
         
         # Perturbation settings
         self.perturbations_enabled = perturbations
@@ -199,7 +319,9 @@ class SyntheticDatasetBuilder:
             'fonts_without_bold': 0,
             'fonts_used': 0,
             'fonts_skipped': 0,
+            'fonts_incompatible': 0,  # Fonts que no suporten caràcters requerits
             'images_generated': 0,
+            'images_skipped_unsupported': 0,  # Imatges saltades per falta de suport de caràcters
             'lines_generated': 0,
             'words_generated': 0,
             'train_samples': 0,
@@ -265,7 +387,7 @@ class SyntheticDatasetBuilder:
             print(f"    {name}: {bg_summary[name]}")
 
     def scan_fonts(self):
-        """Escanea el directorio de fuentes y detecta las que tienen bold"""
+        """Escanea el directorio de fuentes y filtra por compatibilidad con cada idioma"""
         print("[1] Escaneando fuentes...")
 
         if self.category_filter:
@@ -274,7 +396,8 @@ class SyntheticDatasetBuilder:
         else:
             self.category_filter_list = None
 
-        fonts_by_category = defaultdict(list)
+        # Primer, recollir totes les fonts disponibles
+        all_fonts = []
 
         for category_dir in self.fonts_dir.iterdir():
             if not category_dir.is_dir():
@@ -337,89 +460,153 @@ class SyntheticDatasetBuilder:
                             print(f"  [SKIP] {category_dir.name}/{font_dir.name} - Sin normal")
 
                 if font_info:
-                    fonts_by_category[category_dir.name].append(font_info)
+                    all_fonts.append(font_info)
 
-        category_stats = {}
-        for category_name, category_fonts in fonts_by_category.items():
-            available = len(category_fonts)
-            if self.max_fonts_per_category is not None and available > self.max_fonts_per_category:
-                random.shuffle(category_fonts)
-                selected_fonts = category_fonts[:self.max_fonts_per_category]
-                used = len(selected_fonts)
-            else:
-                selected_fonts = category_fonts
-                used = available
-            self.fonts.extend(selected_fonts)
-            category_stats[category_name] = {'available': available, 'used': used}
-
+        # Ara filtrar fonts per cada idioma
+        self.fonts_by_lang = {}
+        self.stats['fonts_by_lang'] = {}
+        
+        for lang in self.languages:
+            required_chars = self.required_chars_by_lang[lang]
+            compatible_fonts = []
+            
+            for font_info in all_fonts:
+                if _font_supports_chars(font_info['path'], required_chars):
+                    compatible_fonts.append(font_info.copy())
+            
+            # Aplicar límit per categoria si cal
+            if self.max_fonts_per_category is not None:
+                fonts_by_cat = defaultdict(list)
+                for f in compatible_fonts:
+                    fonts_by_cat[f['category']].append(f)
+                
+                limited_fonts = []
+                for cat_fonts in fonts_by_cat.values():
+                    random.shuffle(cat_fonts)
+                    limited_fonts.extend(cat_fonts[:self.max_fonts_per_category])
+                compatible_fonts = limited_fonts
+            
+            self.fonts_by_lang[lang] = compatible_fonts
+            self.stats['fonts_by_lang'][lang] = len(compatible_fonts)
+        
+        # self.fonts manté totes les fonts per compatibilitat
+        # (usar la unió de totes les fonts compatibles amb algun idioma)
+        all_compatible = {}
+        for lang_fonts in self.fonts_by_lang.values():
+            for f in lang_fonts:
+                all_compatible[f['name']] = f
+        self.fonts = list(all_compatible.values())
+        
         self.stats['fonts_used'] = len(self.fonts)
+        self.stats['fonts_incompatible'] = len(all_fonts) - len(self.fonts)
 
         print(f"  [OK] Fuentes escaneadas:")
         print(f"    Con bold: {self.stats['fonts_with_bold']}")
         print(f"    Sin bold: {self.stats['fonts_without_bold']}")
-        print(f"    Fuentes usadas ({self.style}): {self.stats['fonts_used']}")
-        print(f"    Fuentes saltadas: {self.stats['fonts_skipped']}")
+        print(f"    Fuentes totales encontradas: {len(all_fonts)}")
+        
+        print(f"\n  [FILTRO PER IDIOMA]")
+        for lang in self.languages:
+            print(f"    {lang}: {self.stats['fonts_by_lang'][lang]} fonts compatibles")
+        
+        if len(self.languages) > 1:
+            min_fonts = min(self.stats['fonts_by_lang'].values())
+            max_fonts = max(self.stats['fonts_by_lang'].values())
+            print(f"    (rang: {min_fonts} - {max_fonts} fonts)")
 
         if self.max_fonts_per_category is not None:
             print(f"\n  [INFO] Límite por categoría: {self.max_fonts_per_category}")
-        print(f"\n  Fuentes por categoría:")
-        for category_name in sorted(category_stats.keys()):
-            stats = category_stats[category_name]
-            if stats['used'] < stats['available']:
-                print(f"    {category_name}: {stats['used']}/{stats['available']} (limitado)")
-            else:
-                print(f"    {category_name}: {stats['used']}/{stats['available']}")
 
     def load_texts(self):
-        """Carga todos los textos del directorio data"""
+        """Carga todos los textos del directorio data (o múltiples directorios)"""
         print("\n[2] Cargando textos...")
-        txt_sources = []
-        for txt_file in self.data_dir.glob('*.txt'):
-            txt_sources.append((txt_file, self.data_dir.name))
-        for book_dir in self.data_dir.iterdir():
-            if not book_dir.is_dir():
+        
+        # Suportar múltiples directoris separats per comes
+        if isinstance(self.data_dir, str) and ',' in self.data_dir:
+            data_dirs = [Path(d.strip()) for d in self.data_dir.split(',')]
+        else:
+            data_dirs = [Path(self.data_dir)]
+        
+        # Suportar múltiples idiomes separats per comes
+        if isinstance(self.language, str) and ',' in self.language:
+            languages = [l.strip() for l in self.language.split(',')]
+        else:
+            languages = [self.language] * len(data_dirs)
+        
+        # Assegurar que tenim el mateix nombre d'idiomes que directoris
+        if len(languages) == 1 and len(data_dirs) > 1:
+            languages = languages * len(data_dirs)
+        elif len(languages) != len(data_dirs):
+            print(f"  [WARNING] Nombre d'idiomes ({len(languages)}) != directoris ({len(data_dirs)})")
+            languages = languages[:len(data_dirs)] if len(languages) > len(data_dirs) else languages + [languages[-1]] * (len(data_dirs) - len(languages))
+        
+        for data_dir, lang in zip(data_dirs, languages):
+            if not data_dir.exists():
+                print(f"  [WARNING] Directori no existeix: {data_dir}")
                 continue
-            for txt_file in book_dir.glob('*.txt'):
-                txt_sources.append((txt_file, book_dir.name))
-        for txt_file, book_name in txt_sources:
-            try:
-                with open(txt_file, 'r', encoding='utf-8') as f:
-                    content = f.read()
-                content = content.replace('\n', ' ')
-                content = re.sub(r'\s+', ' ', content)
-                sentences = re.split(r'(?<=[.!?;:])\s+', content)
-                for sentence in sentences:
-                    sentence = sentence.strip()
-                    words = sentence.split()
-                    if 3 <= len(words) <= 15 and any(c.isalpha() for c in sentence):
-                        self.texts.append({
-                            'text': sentence,
-                            'book': book_name,
-                            'file': txt_file.name
-                        })
-                    elif len(words) > 15:
-                        subparts = re.split(r'(?<=[,;])\s+', sentence)
-                        for part in subparts:
-                            part = part.strip()
-                            part_words = part.split()
-                            if 3 <= len(part_words) <= 15 and any(c.isalpha() for c in part):
-                                self.texts.append({
-                                    'text': part,
-                                    'book': book_name,
-                                    'file': txt_file.name
-                                })
-            except Exception as e:
-                if self.verbose:
-                    print(f"  [ERROR] Error leyendo {txt_file}: {e}")
-        print(f"  [OK] {len(self.texts)} frases cargadas")
+                
+            txt_sources = []
+            for txt_file in data_dir.glob('*.txt'):
+                txt_sources.append((txt_file, data_dir.name))
+            for book_dir in data_dir.iterdir():
+                if not book_dir.is_dir():
+                    continue
+                for txt_file in book_dir.glob('*.txt'):
+                    txt_sources.append((txt_file, book_dir.name))
+            
+            texts_loaded = 0
+            for txt_file, book_name in txt_sources:
+                try:
+                    with open(txt_file, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                    content = content.replace('\n', ' ')
+                    content = re.sub(r'\s+', ' ', content)
+                    sentences = re.split(r'(?<=[.!?;:])\s+', content)
+                    for sentence in sentences:
+                        sentence = sentence.strip()
+                        words = sentence.split()
+                        if 3 <= len(words) <= 15 and any(c.isalpha() for c in sentence):
+                            self.texts.append({
+                                'text': sentence,
+                                'book': book_name,
+                                'file': txt_file.name,
+                                'language': lang
+                            })
+                            texts_loaded += 1
+                        elif len(words) > 15:
+                            subparts = re.split(r'(?<=[,;])\s+', sentence)
+                            for part in subparts:
+                                part = part.strip()
+                                part_words = part.split()
+                                if 3 <= len(part_words) <= 15 and any(c.isalpha() for c in part):
+                                    self.texts.append({
+                                        'text': part,
+                                        'book': book_name,
+                                        'file': txt_file.name,
+                                        'language': lang
+                                    })
+                                    texts_loaded += 1
+                except Exception as e:
+                    if self.verbose:
+                        print(f"  [ERROR] Error leyendo {txt_file}: {e}")
+            
+            print(f"  [OK] {lang}: {texts_loaded} frases carregades de {data_dir}")
+        
+        print(f"  [OK] Total: {len(self.texts)} frases carregades")
 
     def generate_image(self, text, font_info, target_height=128):
         """Genera una imagen con el texto y la fuente especificada"""
-        # Marge horitzontal (píxels a cada costat)
+        # Marges (píxels a cada costat)
         HORIZONTAL_MARGIN = 20
+        VERTICAL_MARGIN = 10
         
         try:
             font_path = font_info['path']
+            
+            # Verificar que la font suporta tots els caràcters del text
+            if not _check_font_supports_text_cached(str(font_path), text):
+                return None, 'plain', 'white'  # Font no suporta el text
+            
             font_size = int(target_height * 0.7)
             font = ImageFont.truetype(str(font_path), font_size)
 
@@ -430,9 +617,10 @@ class SyntheticDatasetBuilder:
             text_width = bbox[2] - bbox[0]
             text_height = bbox[3] - bbox[1]
 
-            # Ajustar font_size para alcanzar target_height
+            # Ajustar font_size para alcanzar target_height (deixant espai pels marges)
+            available_height = target_height - 2 * VERTICAL_MARGIN
             if text_height > 0:
-                scale_factor = (target_height * 0.8) / text_height
+                scale_factor = (available_height * 0.9) / text_height
                 font_size = int(font_size * scale_factor)
                 font = ImageFont.truetype(str(font_path), font_size)
                 bbox = temp_draw.textbbox((0, 0), text, font=font)
@@ -473,7 +661,7 @@ class SyntheticDatasetBuilder:
 
             draw = ImageDraw.Draw(img)
 
-            # Centrar texto verticalmente
+            # Centrar texto verticalment
             y = (target_height - text_height) // 2 - bbox[1]
 
             # Color de tinta con ligera variación
@@ -489,7 +677,7 @@ class SyntheticDatasetBuilder:
                 print(f"  [ERROR] Error generando imagen: {e}")
             return None, 'plain', 'white'
 
-    def generate_dataset(self, max_texts=None, target_height=128):
+    def generate_dataset(self, max_texts=None, total_images=None, balanced=False, target_height=128):
         """Genera el dataset sintético en formato HuggingFace"""
         print(f"\n[3] Generando dataset ({self.mode})...")
 
@@ -501,10 +689,127 @@ class SyntheticDatasetBuilder:
             print("  [ERROR] No hay textos disponibles")
             return
 
-        texts_to_use = self.texts[:max_texts] if max_texts else self.texts
-        random.shuffle(texts_to_use)
+        num_fonts = len(self.fonts)
+        
+        # Comptar idiomes primer (necessari per calcular correctament)
+        texts_by_lang = {}
+        for t in self.texts:
+            lang = t.get('language', 'unknown')
+            if lang not in texts_by_lang:
+                texts_by_lang[lang] = []
+            texts_by_lang[lang].append(t)
+        num_languages = len(texts_by_lang)
+        
+        # Obtenir el mínim de fonts entre tots els idiomes (per garantir equilibri)
+        if hasattr(self, 'fonts_by_lang') and self.fonts_by_lang:
+            min_fonts_per_lang = min(len(f) for f in self.fonts_by_lang.values()) if self.fonts_by_lang else num_fonts
+        else:
+            min_fonts_per_lang = num_fonts
+        
+        # Si s'ha especificat total_images, calcular textos i fonts PER IDIOMA
+        # Cada idioma pot tenir un nombre diferent de fonts disponibles
+        self.texts_per_lang_limit = {}  # Límit de textos per idioma
+        self.fonts_per_lang_limit = {}  # Límit de fonts per idioma
+        
+        if total_images:
+            if balanced and num_languages > 1 and hasattr(self, 'fonts_by_lang') and self.fonts_by_lang:
+                # Càlcul DINÀMIC per idioma
+                images_per_lang = total_images // num_languages
+                MIN_TEXTS_PER_LANG = 5  # Mínim textos per varietat lingüística
+                
+                print(f"  [INFO] Target: {total_images} imatges ({images_per_lang}/idioma)")
+                print(f"  [CÀLCUL DINÀMIC PER IDIOMA]")
+                
+                total_expected = 0
+                for lang in self.fonts_by_lang:
+                    fonts_available = len(self.fonts_by_lang[lang])
+                    
+                    if fonts_available == 0:
+                        self.texts_per_lang_limit[lang] = 0
+                        self.fonts_per_lang_limit[lang] = 0
+                        continue
+                    
+                    # Calcular fonts a usar: limitar si tenim masses per garantir mínim textos
+                    max_fonts_for_min_texts = images_per_lang // MIN_TEXTS_PER_LANG
+                    if max_fonts_for_min_texts < 1:
+                        max_fonts_for_min_texts = 1
+                    
+                    fonts_to_use = min(fonts_available, max_fonts_for_min_texts)
+                    
+                    # Calcular textos necessaris per arribar al target
+                    texts_needed = images_per_lang // fonts_to_use
+                    if texts_needed < MIN_TEXTS_PER_LANG:
+                        texts_needed = MIN_TEXTS_PER_LANG
+                    
+                    # Limitar fonts per aquest idioma
+                    if fonts_to_use < fonts_available:
+                        random.shuffle(self.fonts_by_lang[lang])
+                        self.fonts_by_lang[lang] = self.fonts_by_lang[lang][:fonts_to_use]
+                    
+                    self.texts_per_lang_limit[lang] = texts_needed
+                    self.fonts_per_lang_limit[lang] = fonts_to_use
+                    
+                    expected = texts_needed * fonts_to_use
+                    total_expected += expected
+                    print(f"    {lang}: {texts_needed} textos × {fonts_to_use} fonts = {expected} imatges")
+                
+                print(f"  [INFO] Total esperat: {total_expected} imatges (target: {total_images})")
+                
+                # max_texts es calcularà al sampling equilibrat
+                max_texts = None
+            else:
+                # Un sol idioma o no equilibrat
+                max_texts = total_images // min_fonts_per_lang
+                if max_texts < 1:
+                    max_texts = 1
+                print(f"  [INFO] total_images={total_images} → max_texts={max_texts} (amb {min_fonts_per_lang} fonts)")
+        
+        # Sampling equilibrat per idiomes
+        if balanced and num_languages > 1:
+            # Seleccionar textos per idioma segons els límits calculats
+            texts_to_use = []
+            for lang, texts in texts_by_lang.items():
+                random.shuffle(texts)
+                
+                # Usar límit específic per idioma si existeix, sinó calcular
+                if lang in self.texts_per_lang_limit:
+                    texts_needed = self.texts_per_lang_limit[lang]
+                elif max_texts:
+                    texts_needed = max_texts // num_languages
+                    if texts_needed < 1:
+                        texts_needed = 1
+                else:
+                    texts_needed = len(texts)
+                
+                selected = min(texts_needed, len(texts))
+                texts_to_use.extend(texts[:selected])
+                
+                fonts_for_lang = len(self.fonts_by_lang.get(lang, self.fonts))
+                expected_imgs = selected * fonts_for_lang
+                print(f"  [BALANCED] {lang}: {selected} textos × {fonts_for_lang} fonts = {expected_imgs} imatges")
+            
+            random.shuffle(texts_to_use)
+            print(f"  [BALANCED] Total textos: {len(texts_to_use)}")
+        else:
+            # IMPORTANT: Barrejar ABANS de seleccionar per garantir mescla d'idiomes
+            random.shuffle(self.texts)
+            texts_to_use = self.texts[:max_texts] if max_texts else self.texts
 
-        print(f"  [INFO] Generando: {len(texts_to_use)} textos × {len(self.fonts)} fuentes")
+        # Mostrar distribució d'idiomes
+        lang_counts = {}
+        for t in texts_to_use:
+            lang = t.get('language', 'unknown')
+            lang_counts[lang] = lang_counts.get(lang, 0) + 1
+        if len(lang_counts) > 1:
+            print(f"  [INFO] Distribució textos: {lang_counts}")
+
+        # Calcular total imatges esperades (considerant fonts per idioma)
+        total_expected_images = 0
+        for lang, count in lang_counts.items():
+            fonts_for_lang = len(self.fonts_by_lang.get(lang, self.fonts))
+            total_expected_images += count * fonts_for_lang
+        
+        print(f"  [INFO] Total imatges esperades: {total_expected_images}")
         if self.backgrounds:
             print(f"  [INFO] Fondos: {len(self.backgrounds)} disponibles")
         else:
@@ -518,22 +823,76 @@ class SyntheticDatasetBuilder:
             print(f"  [INFO] Usando {self.num_workers} workers en paralelo")
 
         n_texts = len(texts_to_use)
-        train_end = int(n_texts * self.train_split)
-        val_end = train_end + int(n_texts * self.val_split)
+        
+        # Si tenim múltiples idiomes, fer split PER IDIOMA per garantir equilibri
+        if len(lang_counts) > 1:
+            # Agrupar textos per idioma
+            texts_by_lang_to_split = {}
+            for t in texts_to_use:
+                lang = t.get('language', 'unknown')
+                if lang not in texts_by_lang_to_split:
+                    texts_by_lang_to_split[lang] = []
+                texts_by_lang_to_split[lang].append(t)
+            
+            train_texts = []
+            val_texts = []
+            test_texts = []
+            
+            for lang, lang_texts in texts_by_lang_to_split.items():
+                n = len(lang_texts)
+                if n == 1:
+                    # Només 1 text: va tot al train
+                    train_texts.extend(lang_texts)
+                elif n == 2:
+                    # 2 textos: 1 train, 1 test
+                    train_texts.append(lang_texts[0])
+                    test_texts.append(lang_texts[1])
+                else:
+                    # 3+ textos: split normal
+                    train_end_lang = max(1, int(n * self.train_split))
+                    val_end_lang = train_end_lang + max(1, int(n * self.val_split))
+                    if val_end_lang >= n:
+                        val_end_lang = n - 1
+                    
+                    train_texts.extend(lang_texts[:train_end_lang])
+                    val_texts.extend(lang_texts[train_end_lang:val_end_lang])
+                    test_texts.extend(lang_texts[val_end_lang:])
+            
+            # Barrejar dins de cada split
+            random.shuffle(train_texts)
+            random.shuffle(val_texts)
+            random.shuffle(test_texts)
+            
+            # Mostrar distribució per split
+            for split_name, split_texts in [('train', train_texts), ('val', val_texts), ('test', test_texts)]:
+                if split_texts:
+                    split_langs = {}
+                    for t in split_texts:
+                        l = t.get('language', 'unknown')
+                        split_langs[l] = split_langs.get(l, 0) + 1
+                    print(f"  [SPLIT] {split_name}: {split_langs}")
+        else:
+            # Un sol idioma: split normal
+            train_end = int(n_texts * self.train_split)
+            val_end = train_end + int(n_texts * self.val_split)
 
-        train_texts = texts_to_use[:train_end]
-        val_texts = texts_to_use[train_end:val_end]
-        test_texts = texts_to_use[val_end:]
+            train_texts = texts_to_use[:train_end]
+            val_texts = texts_to_use[train_end:val_end]
+            test_texts = texts_to_use[val_end:]
 
         train_metadata = []
         val_metadata = []
         test_metadata = []
 
-        if self.mode == 'words':
-            total_words = sum(len(td['text'].split()) for td in texts_to_use)
-            total_items = total_words * len(self.fonts)
-        else:
-            total_items = len(texts_to_use) * len(self.fonts)
+        # Calcular total_items tenint en compte fonts per idioma
+        total_items = 0
+        for td in texts_to_use:
+            text_lang = td.get('language', self.languages[0] if self.languages else 'unknown')
+            num_fonts = len(self.fonts_by_lang.get(text_lang, self.fonts))
+            if self.mode == 'words':
+                total_items += len(td['text'].split()) * num_fonts
+            else:
+                total_items += num_fonts
 
         print(f"  Total imágenes esperadas: {total_items:,}")
 
@@ -579,23 +938,34 @@ class SyntheticDatasetBuilder:
             'quality_distribution': self.quality_distribution
         } if self.perturbations_enabled else None
 
-        for font_info in self.fonts:
-            for split_name, split_texts, split_dir in [
-                ('train', train_texts, self.train_dir),
-                ('validation', val_texts, self.val_dir),
-                ('test', test_texts, self.test_dir)
-            ]:
-                for text_data in split_texts:
-                    text = text_data['text']
-                    if self.mode == 'words':
-                        words = text.split()
-                        if not words:
-                            continue
-                        words_to_render = words
-                    else:
-                        words_to_render = [text]
+        for split_name, split_texts, split_dir in [
+            ('train', train_texts, self.train_dir),
+            ('validation', val_texts, self.val_dir),
+            ('test', test_texts, self.test_dir)
+        ]:
+            for text_data in split_texts:
+                text = text_data['text']
+                text_lang = text_data.get('language', self.languages[0] if self.languages else 'unknown')
+                
+                # Obtenir fonts compatibles amb aquest idioma
+                if text_lang in self.fonts_by_lang:
+                    compatible_fonts = self.fonts_by_lang[text_lang]
+                else:
+                    compatible_fonts = self.fonts  # Fallback
+                
+                if not compatible_fonts:
+                    continue
+                
+                if self.mode == 'words':
+                    words = text.split()
+                    if not words:
+                        continue
+                    words_to_render = words
+                else:
+                    words_to_render = [text]
 
-                    for text_to_render in words_to_render:
+                for text_to_render in words_to_render:
+                    for font_info in compatible_fonts:
                         img_filename = f"{counters[split_name]:08d}.png"
                         counters[split_name] += 1
 
@@ -620,7 +990,8 @@ class SyntheticDatasetBuilder:
                             'background': bg_data,
                             'mode': self.mode,
                             'split_name': split_name,
-                            'perturbation_config': perturbation_config
+                            'perturbation_config': perturbation_config,
+                            'language': text_data.get('language', self.language)
                         }
                         tasks.append(task)
 
@@ -671,6 +1042,7 @@ class SyntheticDatasetBuilder:
                 test_metadata.append(result)
 
         self.stats['images_generated'] = len(results)
+        self.stats['images_skipped_unsupported'] = len(tasks) - len(results)
         self.stats['train_samples'] = len(train_metadata)
         self.stats['val_samples'] = len(val_metadata)
         self.stats['test_samples'] = len(test_metadata)
@@ -689,26 +1061,38 @@ class SyntheticDatasetBuilder:
         global_test_count = 0
 
         with tqdm(total=total_items, desc="Generando imágenes", unit="img") as pbar:
-            for font_info in self.fonts:
-                for split_name, split_texts, split_dir, split_metadata in [
-                    ('train', train_texts, self.train_dir, train_metadata),
-                    ('validation', val_texts, self.val_dir, val_metadata),
-                    ('test', test_texts, self.test_dir, test_metadata)
-                ]:
-                    for text_data in split_texts:
-                        text = text_data['text']
-                        if self.mode == 'words':
-                            words = text.split()
-                            if not words:
-                                continue
-                            words_to_render = words
-                        else:
-                            words_to_render = [text]
+            for split_name, split_texts, split_dir, split_metadata in [
+                ('train', train_texts, self.train_dir, train_metadata),
+                ('validation', val_texts, self.val_dir, val_metadata),
+                ('test', test_texts, self.test_dir, test_metadata)
+            ]:
+                for text_data in split_texts:
+                    text = text_data['text']
+                    text_lang = text_data.get('language', self.languages[0] if self.languages else 'unknown')
+                    
+                    # Obtenir fonts compatibles amb aquest idioma
+                    if text_lang in self.fonts_by_lang:
+                        compatible_fonts = self.fonts_by_lang[text_lang]
+                    else:
+                        compatible_fonts = self.fonts  # Fallback
+                    
+                    if not compatible_fonts:
+                        continue
+                    
+                    if self.mode == 'words':
+                        words = text.split()
+                        if not words:
+                            continue
+                        words_to_render = words
+                    else:
+                        words_to_render = [text]
 
-                        for text_to_render in words_to_render:
+                    for text_to_render in words_to_render:
+                        for font_info in compatible_fonts:
                             img_result = self.generate_image(text_to_render, font_info, target_height)
 
                             if img_result[0] is None:
+                                self.stats['images_skipped_unsupported'] += 1
                                 pbar.update(1)
                                 continue
 
@@ -849,8 +1233,12 @@ class SyntheticDatasetBuilder:
         print(f"\nFuentes:")
         print(f"  Con bold: {self.stats['fonts_with_bold']}")
         print(f"  Sin bold: {self.stats['fonts_without_bold']}")
-        print(f"  Usadas: {self.stats['fonts_used']}")
-        print(f"  Saltadas: {self.stats['fonts_skipped']}")
+        print(f"  Compatibles usadas: {self.stats['fonts_used']}")
+        if self.stats['fonts_incompatible'] > 0:
+            print(f"  Incompatibles (caràcters): {self.stats['fonts_incompatible']}")
+        other_skipped = self.stats['fonts_skipped'] - self.stats['fonts_incompatible']
+        if other_skipped > 0:
+            print(f"  Saltadas (otras): {other_skipped}")
         print(f"\nFondos de papel:")
         if self.backgrounds:
             bg_summary = defaultdict(int)
@@ -872,6 +1260,8 @@ class SyntheticDatasetBuilder:
             print(f"  Estado: DESACTIVADAS")
         print(f"\nImágenes generadas:")
         print(f"  Total: {self.stats['images_generated']:,}")
+        if self.stats['images_skipped_unsupported'] > 0:
+            print(f"  Saltadas (font no suporta caràcters): {self.stats['images_skipped_unsupported']:,}")
         if self.mode == 'words':
             print(f"  Palabras: {self.stats['words_generated']:,}")
         else:
@@ -903,6 +1293,7 @@ def main():
     parser.add_argument('--fonts-dir', default='fonts', help='Directorio con fuentes (default: fonts)')
     parser.add_argument('--output-dir', default='output', help='Directorio base de salida (default: output)')
     parser.add_argument('--output-name', default=None, help='Nombre personalizado para el output')
+    parser.add_argument('--language', default='unknown', help='Idioma del dataset (default: unknown)')
     parser.add_argument('--mode', choices=['lines', 'words'], default='lines',
                         help='Modo: lines (frases) o words (palabras) (default: lines)')
     parser.add_argument('--style', choices=['normal', 'bold'], default='normal',
@@ -913,6 +1304,10 @@ def main():
                         help='Proporción de datos para validación (default: 0.1)')
     parser.add_argument('--max-texts', type=int, default=None,
                         help='Número máximo de textos a usar (default: todos)')
+    parser.add_argument('--total-images', type=int, default=None,
+                        help='Número total de imágenes a generar (calcula textos automáticamente)')
+    parser.add_argument('--balanced', action='store_true',
+                        help='Equilibrar número de imágenes por idioma')
     parser.add_argument('--font-size', type=int, default=128,
                         help='Altura de imagen en píxeles (default: 128, compatible con IAM/TrOCR)')
     parser.add_argument('--workers', '-j', type=int, default=1,
@@ -992,6 +1387,7 @@ def main():
         background_type=args.background_type,
         perturbations=args.perturbations,
         quality_distribution=quality_dist,
+        language=args.language,
         verbose=args.verbose
     )
 
@@ -1000,6 +1396,8 @@ def main():
 
     builder.generate_dataset(
         max_texts=args.max_texts,
+        total_images=args.total_images,
+        balanced=args.balanced,
         target_height=args.font_size
     )
 

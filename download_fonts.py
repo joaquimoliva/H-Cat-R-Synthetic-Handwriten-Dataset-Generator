@@ -112,7 +112,12 @@ def main():
         with open(args.csv_file, 'r', encoding='utf-8') as f:
             reader = csv.DictReader(f)
             for row in reader:
-                if row.get('supports_language') == 'True' or row.get('supports_catalan') == 'True':
+                # Suportar tant el format antic (supports_language=True) 
+                # com el nou (supported_languages="catalan,polish,...")
+                supported_langs = row.get('supported_languages', '').strip()
+                supports_old = row.get('supports_language') == 'True' or row.get('supports_catalan') == 'True'
+                
+                if supported_langs or supports_old:
                     fonts_to_download.append(row)
                     categories.add(row['category'])
     except Exception as e:

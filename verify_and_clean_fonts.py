@@ -1,8 +1,13 @@
 #!/usr/bin/env python3
 """
-Verify existing fonts for required character, number, and punctuation support.
-Remove fonts that don't support all required characters.
-Includes watermark detection in special characters (spaces, apostrophes).
+Verify existing fonts for corruption and watermark detection.
+By default, does NOT remove fonts based on language-specific characters
+(this is now handled by build_dataset.py per-language filtering).
+
+Only removes fonts that:
+- Are corrupted (cannot be loaded)
+- Have no valid character map
+- Contain embedded watermarks/logos
 """
 
 import os
@@ -14,76 +19,56 @@ from tqdm import tqdm
 import argparse
 
 class FontVerifier:
-    def __init__(self, fonts_dir='fonts', language='catalan', verbose=False, dry_run=False):
+    def __init__(self, fonts_dir='fonts', language='catalan', verbose=False, 
+                 dry_run=False, check_language_chars=False):
         self.fonts_dir = Path(fonts_dir)
         self.verbose = verbose
         self.dry_run = dry_run
+        self.check_language_chars = check_language_chars
 
-        # Load language config
+        # Load language config (only used if check_language_chars=True)
         self.language = language
         self.lang_config = self._load_language_config(language)
 
-        # Base required characters (common to all languages)
-        self.required_chars = {
-            # Digits
-            0x0030: ('digit 0', '0'),
-            0x0031: ('digit 1', '1'),
-            0x0032: ('digit 2', '2'),
-            0x0033: ('digit 3', '3'),
-            0x0034: ('digit 4', '4'),
-            0x0035: ('digit 5', '5'),
-            0x0036: ('digit 6', '6'),
-            0x0037: ('digit 7', '7'),
-            0x0038: ('digit 8', '8'),
-            0x0039: ('digit 9', '9'),
-            
-            # Basic punctuation
-            0x002E: ('period', '.'),
-            0x002C: ('comma', ','),
-            0x003A: ('colon', ':'),
-            0x003B: ('semicolon', ';'),
-            0x0021: ('exclamation mark', '!'),
-            0x003F: ('question mark', '?'),
-            
-            # Quotes and apostrophes
-            0x0027: ('apostrophe', "'"),
-            0x0022: ('quotation mark', '"'),
-            
-            # Brackets and parentheses
+        # Base required characters - only numbers and basic punctuation
+        # These are needed by ANY language, so safe to check always
+        self.base_required_chars = {
+            0x0030: ('0 (zero)', '0'),
+            0x0031: ('1 (one)', '1'),
+            0x0032: ('2 (two)', '2'),
+            0x0033: ('3 (three)', '3'),
+            0x0034: ('4 (four)', '4'),
+            0x0035: ('5 (five)', '5'),
+            0x0036: ('6 (six)', '6'),
+            0x0037: ('7 (seven)', '7'),
+            0x0038: ('8 (eight)', '8'),
+            0x0039: ('9 (nine)', '9'),
+            0x002D: ('hyphen-minus', '-'),
             0x0028: ('left parenthesis', '('),
             0x0029: ('right parenthesis', ')'),
-            0x005B: ('left bracket', '['),
-            0x005D: ('right bracket', ']'),
-            
-            # Hyphens and dashes
-            0x002D: ('hyphen-minus', '-'),
-            
-            # Common symbols
-            0x0025: ('percent', '%'),
-            0x0026: ('ampersand', '&'),
-            0x0040: ('at sign', '@'),
-            0x002F: ('slash', '/'),
-            
-            # Mathematical
-            0x002B: ('plus', '+'),
-            0x003D: ('equals', '='),
-            
-            # Currency (common)
-            0x20AC: ('euro', '€'),
-            0x0024: ('dollar', '$'),
+            0x0020: ('space', ' '),
+            0x002E: ('period', '.'),
+            0x002C: ('comma', ','),
         }
-
-        # Add language-specific characters
-        for char in self.lang_config.get('required_chars', []):
-            codepoint = ord(char)
-            self.required_chars[codepoint] = (f'lang-specific: {char}', char)
+        
+        # Full required chars (base + language-specific)
+        self.required_chars = dict(self.base_required_chars)
+        
+        # Only add language-specific characters if explicitly requested
+        if self.check_language_chars:
+            for char in self.lang_config.get('required_chars', []):
+                codepoint = ord(char)
+                self.required_chars[codepoint] = (f'lang-specific: {char}', char)
 
         self.stats = {
             'total_fonts': 0,
             'valid_fonts': 0,
             'invalid_fonts': 0,
             'removed_fonts': 0,
-            'errors': 0
+            'errors': 0,
+            'watermark_detected': 0,
+            'corrupted': 0,
+            'missing_chars': 0
         }
 
         self.invalid_fonts = []  # Store info about invalid fonts
@@ -96,7 +81,8 @@ class FontVerifier:
             with open(config_path, 'r', encoding='utf-8') as f:
                 return json.load(f)
         else:
-            print(f"[WARNING] No language config found: {config_path}")
+            if self.verbose:
+                print(f"[INFO] No language config found: {config_path}")
             return {'required_chars': []}
 
     def detect_watermark_in_special_chars(self, font_path, font_size=64):
@@ -108,12 +94,6 @@ class FontVerifier:
         - Apostrophe (U+0027)
         - Quotation marks (U+0022, U+2018, U+2019)
         - Other punctuation
-        
-        Detection strategy:
-        1. Render a phrase WITH special chars and measure total width
-        2. Render the same phrase WITHOUT special chars
-        3. Calculate expected space width based on letter widths
-        4. If actual space width >> expected, likely contains watermark
         
         Returns: (is_clean, reason)
         """
@@ -162,7 +142,6 @@ class FontVerifier:
                 return False, f"Apostrophe contains watermark (width: {actual_apos_width:.0f}px vs expected ~{expected_space_width:.0f}px)"
             
             # Visual check: render phrase with spaces and look for repeated patterns
-            # This catches watermarks that might appear as visual noise
             test_phrase = "a a a a a"  # Multiple spaces
             phrase_img = Image.new('L', (2000, 100), 255)
             phrase_draw = ImageDraw.Draw(phrase_img)
@@ -197,8 +176,17 @@ class FontVerifier:
 
     def check_font_file(self, font_path):
         """
-        Check if a font file supports all required characters
-        Uses both cmap check AND actual rendering test
+        Check if a font file is valid and usable.
+        
+        Checks:
+        1. Font can be loaded (not corrupted)
+        2. Has a valid character map
+        3. Can render basic characters
+        4. No embedded logos in regular glyphs
+        5. No watermarks in special characters (spaces, apostrophes)
+        6. (Optional) Supports language-specific characters
+        
+        Returns: (is_valid, reason, issue_type)
         """
         try:
             # Step 1: Check cmap (character mapping table)
@@ -206,75 +194,45 @@ class FontVerifier:
             cmap = font.getBestCmap()
 
             if not cmap:
-                return False, "No character map found"
+                return False, "No character map found", "corrupted"
 
-            # Check for all required characters in cmap
+            # Step 2: Check for base required characters in cmap
+            # Only check base chars (numbers, basic punctuation) - NOT language-specific
+            chars_to_check = self.required_chars if self.check_language_chars else self.base_required_chars
+            
             missing_in_cmap = []
-            for codepoint, (name, char) in self.required_chars.items():
+            for codepoint, (name, char) in chars_to_check.items():
                 if codepoint not in cmap:
                     missing_in_cmap.append(char)
 
             if missing_in_cmap:
-                return False, f"Missing in cmap: {', '.join(missing_in_cmap)}"
+                issue_type = "missing_lang_chars" if self.check_language_chars else "missing_base_chars"
+                return False, f"Missing in cmap: {', '.join(missing_in_cmap)}", issue_type
 
-            # Step 2: Test actual rendering with PIL (more robust check)
-            # This catches fonts that have cmap entries but fail to render
-            # Also detects .notdef glyphs (empty boxes for missing characters)
+            # Step 3: Test actual rendering with PIL (more robust check)
             try:
                 pil_font = ImageFont.truetype(str(font_path), 32)
-                test_img = Image.new('L', (100, 50), 255)  # Grayscale for comparison
+                test_img = Image.new('RGB', (200, 50), 'white')
                 draw = ImageDraw.Draw(test_img)
-
-                # First, get reference image of .notdef glyph (missing character box)
-                # Use a character that almost certainly doesn't exist
-                notdef_img = Image.new('L', (100, 50), 255)
-                notdef_draw = ImageDraw.Draw(notdef_img)
-                notdef_draw.text((10, 10), '\uffff', font=pil_font, fill=0)  # U+FFFF rarely exists
-                notdef_bbox = notdef_img.getbbox()
-                notdef_bytes = notdef_img.crop(notdef_bbox).tobytes() if notdef_bbox else None
 
                 # Test each required character
                 cannot_render = []
-                for codepoint, (name, char) in self.required_chars.items():
+                for codepoint, (name, char) in chars_to_check.items():
                     try:
-                        # Try to get bounding box - if it fails, font can't render it
                         bbox = draw.textbbox((0, 0), char, font=pil_font)
                         width = bbox[2] - bbox[0]
-
-                        # Some fonts have glyphs with 0 width for missing chars
                         if width <= 0:
                             cannot_render.append(char)
-                            continue
-
-                        # Render the character and check if it's actually visible
-                        char_img = Image.new('L', (100, 50), 255)
-                        char_draw = ImageDraw.Draw(char_img)
-                        char_draw.text((10, 10), char, font=pil_font, fill=0)
-                        char_bbox = char_img.getbbox()
-                        
-                        # If getbbox() returns None, the glyph is empty/invisible
-                        if char_bbox is None:
-                            cannot_render.append(char)
-                            continue
-                        
-                        # Compare with .notdef to detect placeholder glyphs
-                        if notdef_bytes:
-                            char_bytes = char_img.crop(char_bbox).tobytes()
-                            # If identical to .notdef, the glyph doesn't really exist
-                            if char_bytes == notdef_bytes:
-                                cannot_render.append(char)
-
                     except Exception:
                         cannot_render.append(char)
 
                 if cannot_render:
-                    return False, f"Cannot render (missing/empty glyph): {', '.join(cannot_render)}"
+                    return False, f"Cannot render: {', '.join(cannot_render)}", "corrupted"
 
             except Exception as e:
-                return False, f"PIL rendering error: {str(e)}"
+                return False, f"PIL rendering error: {str(e)}", "corrupted"
 
-            # Step 3: Detect embedded logos/watermarks in regular glyphs
-            # Renders each character individually and checks for anomalies
+            # Step 4: Detect embedded logos/watermarks in regular glyphs
             try:
                 logo_font = ImageFont.truetype(str(font_path), 64)
                 char_images = []
@@ -291,10 +249,7 @@ class FontVerifier:
                         bbox = char_img.getbbox()
                         if bbox:
                             width = bbox[2] - bbox[0]
-                            height = bbox[3] - bbox[1]
                             char_widths.append(width)
-
-                            # Crop to bounding box for comparison
                             cropped = char_img.crop(bbox)
                             char_images.append(cropped.tobytes())
                         else:
@@ -312,7 +267,7 @@ class FontVerifier:
                     if median_width > 0:
                         for i, w in enumerate(char_widths):
                             if w > median_width * 3:
-                                return False, f"Suspicious glyph detected (logo?): char '{test_chars[i]}' width {w} vs median {median_width}"
+                                return False, f"Suspicious glyph (logo?): '{test_chars[i]}' width {w} vs median {median_width}", "watermark"
 
                 # Check 2: If many different characters produce identical images, likely a logo
                 valid_images = [img for img in char_images if img is not None]
@@ -320,26 +275,25 @@ class FontVerifier:
                     unique_images = set(valid_images)
                     duplicate_ratio = 1 - (len(unique_images) / len(valid_images))
                     if duplicate_ratio > 0.5:
-                        return False, f"Too many identical glyphs ({duplicate_ratio:.0%}): likely embedded logo"
+                        return False, f"Too many identical glyphs ({duplicate_ratio:.0%}): likely embedded logo", "watermark"
 
             except Exception as e:
                 if self.verbose:
                     print(f"    [WARNING] Logo detection skipped: {e}")
 
-            # Step 4: NEW - Detect watermarks in special characters (spaces, apostrophes)
-            # This catches fonts like "Borgers" that embed "PERSONAL USE ONLY" in spaces
+            # Step 5: Detect watermarks in special characters (spaces, apostrophes)
             try:
                 is_clean, watermark_reason = self.detect_watermark_in_special_chars(font_path)
                 if not is_clean:
-                    return False, watermark_reason
+                    return False, watermark_reason, "watermark"
             except Exception as e:
                 if self.verbose:
                     print(f"    [WARNING] Special char watermark detection skipped: {e}")
 
-            return True, "All characters supported and renderable"
+            return True, "Font is valid and usable", "valid"
 
         except Exception as e:
-            return False, f"Error: {str(e)}"
+            return False, f"Error: {str(e)}", "corrupted"
 
     def get_all_font_files(self):
         """Get all font files from fonts directory"""
@@ -368,8 +322,11 @@ class FontVerifier:
     def verify_all_fonts(self):
         """Verify all fonts in the fonts directory"""
         print("=" * 60)
-        print("FONT VERIFICATION - language-specific chars + numbers + punctuation")
-        print("               + watermark detection in spaces/apostrophes")
+        if self.check_language_chars:
+            print(f"FONT VERIFICATION - watermarks + corruption + {self.language} chars")
+        else:
+            print("FONT VERIFICATION - watermarks + corruption only")
+            print("(language-specific char filtering done by build_dataset.py)")
         print("=" * 60)
         print()
 
@@ -389,7 +346,7 @@ class FontVerifier:
 
         for font_info in tqdm(font_files, desc="Checking fonts", unit="font"):
             font_path = font_info['path']
-            is_valid, message = self.check_font_file(font_path)
+            is_valid, message, issue_type = self.check_font_file(font_path)
 
             if is_valid:
                 self.stats['valid_fonts'] += 1
@@ -397,12 +354,22 @@ class FontVerifier:
                     print(f"  [OK] {font_info['relative']}")
             else:
                 self.stats['invalid_fonts'] += 1
+                
+                # Track issue types
+                if issue_type == "watermark":
+                    self.stats['watermark_detected'] += 1
+                elif issue_type == "corrupted":
+                    self.stats['corrupted'] += 1
+                elif issue_type in ("missing_lang_chars", "missing_base_chars"):
+                    self.stats['missing_chars'] += 1
+                
                 self.invalid_fonts.append({
                     'path': font_path,
                     'relative': font_info['relative'],
                     'category': font_info['category'],
                     'font_folder': font_info['font_folder'],
-                    'reason': message
+                    'reason': message,
+                    'issue_type': issue_type
                 })
                 if self.verbose:
                     print(f"  [X] {font_info['relative']} - {message}")
@@ -412,6 +379,10 @@ class FontVerifier:
         print(f"  Total fonts checked: {self.stats['total_fonts']}")
         print(f"  Valid fonts: {self.stats['valid_fonts']}")
         print(f"  Invalid fonts: {self.stats['invalid_fonts']}")
+        if self.stats['invalid_fonts'] > 0:
+            print(f"    - Watermarks/logos: {self.stats['watermark_detected']}")
+            print(f"    - Corrupted/unloadable: {self.stats['corrupted']}")
+            print(f"    - Missing characters: {self.stats['missing_chars']}")
 
         if self.invalid_fonts:
             print(f"\n[4] Invalid fonts by category:")
@@ -481,22 +452,25 @@ class FontVerifier:
 
             f.write(f"Total fonts checked: {self.stats['total_fonts']}\n")
             f.write(f"Valid fonts: {self.stats['valid_fonts']}\n")
-            f.write(f"Invalid fonts: {self.stats['invalid_fonts']}\n\n")
+            f.write(f"Invalid fonts: {self.stats['invalid_fonts']}\n")
+            f.write(f"  - Watermarks/logos: {self.stats['watermark_detected']}\n")
+            f.write(f"  - Corrupted: {self.stats['corrupted']}\n")
+            f.write(f"  - Missing chars: {self.stats['missing_chars']}\n\n")
 
             f.write("=" * 60 + "\n")
             f.write("INVALID FONTS DETAILS\n")
             f.write("=" * 60 + "\n\n")
 
-            # Group by category
-            by_category = {}
+            # Group by issue type
+            by_type = {}
             for font in self.invalid_fonts:
-                cat = font['category']
-                if cat not in by_category:
-                    by_category[cat] = []
-                by_category[cat].append(font)
+                t = font.get('issue_type', 'unknown')
+                if t not in by_type:
+                    by_type[t] = []
+                by_type[t].append(font)
 
-            for category, fonts in sorted(by_category.items()):
-                f.write(f"\n{category} ({len(fonts)} fonts)\n")
+            for issue_type, fonts in sorted(by_type.items()):
+                f.write(f"\n{issue_type.upper()} ({len(fonts)} fonts)\n")
                 f.write("-" * 60 + "\n")
                 for font in fonts:
                     f.write(f"  Font: {font['font_folder']}\n")
@@ -507,14 +481,16 @@ class FontVerifier:
 
 def main():
     parser = argparse.ArgumentParser(
-        description='Verify and clean fonts that don\'t support certain characters, numbers, and punctuation'
+        description='Verify and clean fonts - removes corrupted fonts and those with watermarks'
     )
     parser.add_argument('--language', default='catalan',
-                        help='Idioma per verificar suport de caràcters (default: catalan)')
+                        help='Language for char verification (only used with --check-language-chars)')
     parser.add_argument('--fonts-dir', default='fonts', help='Fonts directory (default: fonts)')
     parser.add_argument('--verbose', '-v', action='store_true', help='Show detailed output')
     parser.add_argument('--dry-run', action='store_true', help='Show what would be removed without actually removing')
     parser.add_argument('--no-remove', action='store_true', help='Only verify, don\'t remove invalid fonts')
+    parser.add_argument('--check-language-chars', action='store_true', 
+                        help='Also check language-specific characters (by default, only watermarks and corruption)')
     parser.add_argument('--report', default='font_verification_report.txt', help='Output report file')
 
     args = parser.parse_args()
@@ -523,7 +499,8 @@ def main():
         fonts_dir=args.fonts_dir,
         language=args.language,
         verbose=args.verbose,
-        dry_run=args.dry_run
+        dry_run=args.dry_run,
+        check_language_chars=args.check_language_chars
     )
 
     # Verify all fonts
@@ -544,6 +521,10 @@ def main():
     print(f"Total fonts: {verifier.stats['total_fonts']}")
     print(f"Valid fonts: {verifier.stats['valid_fonts']}")
     print(f"Invalid fonts: {verifier.stats['invalid_fonts']}")
+    if verifier.stats['invalid_fonts'] > 0:
+        print(f"  - Watermarks/logos: {verifier.stats['watermark_detected']}")
+        print(f"  - Corrupted: {verifier.stats['corrupted']}")
+        print(f"  - Missing base chars: {verifier.stats['missing_chars']}")
     if not args.no_remove and not args.dry_run:
         print(f"Removed: {verifier.stats['removed_fonts']} font folders")
     print()

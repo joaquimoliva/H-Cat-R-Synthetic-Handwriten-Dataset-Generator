@@ -3,6 +3,11 @@
 Perturbation module for synthetic handwriting dataset.
 Applies realistic degradations to simulate scanned/photographed documents.
 
+Simplified to 3 effective perturbations:
+- blur: Gaussian blur (most visible)
+- rotation: Slight rotation (simulates misalignment)
+- contrast: Reduced contrast (washes out text)
+
 Usage:
     from apply_perturbations import PerturbationPipeline
     
@@ -31,9 +36,6 @@ class PerturbationParams:
     quality: str = "clean"
     blur_radius: Optional[float] = None
     rotation_angle: Optional[float] = None
-    noise_sigma: Optional[int] = None
-    jpeg_quality: Optional[int] = None
-    brightness_factor: Optional[float] = None
     contrast_factor: Optional[float] = None
     
     def to_dict(self) -> Dict[str, Any]:
@@ -47,31 +49,22 @@ PERTURBATION_RANGES = {
         # No perturbations
     },
     QualityLevel.DEGRADED: {
-        "blur_radius": (0.3, 1.0),
-        "rotation_angle": (-0.5, 0.5),
-        "noise_sigma": (8, 18),
-        "jpeg_quality": (55, 75),
-        "brightness_factor": (0.80, 0.90, 1.10, 1.20),
-        "contrast_factor": (0.80, 0.90, 1.10, 1.20),
+        "blur_radius": (0.5, 1.2),
+        "rotation_angle": (-1.0, 1.0),
+        "contrast_factor": (0.65, 0.80),
     },
     QualityLevel.SEVERE: {
-        "blur_radius": (1.0, 2.0),
-        "rotation_angle": (-1.0, 1.0),
-        "noise_sigma": (18, 30),
-        "jpeg_quality": (20, 40),
-        "brightness_factor": (0.55, 0.75),   # Sempre més fosc (degradant)
-        "contrast_factor": (0.50, 0.70),     # Sempre menys contrast (degradant)
+        "blur_radius": (2.0, 3.5),
+        "rotation_angle": (-2.0, 2.0),
+        "contrast_factor": (0.30, 0.50),
     },
 }
 
 # Probability of applying each perturbation (when quality is not clean)
 PERTURBATION_PROBABILITIES = {
-    "blur": 0.5,
-    "rotation": 0.3,  # Reactivat
-    "noise": 0.5,
-    "jpeg": 0.4,
-    "brightness": 0.4,
-    "contrast": 0.4,
+    "blur": 0.7,
+    "rotation": 0.5,
+    "contrast": 0.6,
 }
 
 
@@ -247,7 +240,6 @@ class PerturbationPipeline:
         # Ensure RGB mode for processing
         original_mode = image.mode
         if image.mode == 'RGBA':
-            # Preserve for later, work in RGB
             alpha = image.split()[3]
             image = image.convert('RGB')
         elif image.mode == 'L':
@@ -256,89 +248,39 @@ class PerturbationPipeline:
         # Detect background color for rotation fill
         bg_color = self._detect_background_color(image)
         
-        # Limit max perturbations to avoid over-distortion
-        max_perturbations = 2 if quality == QualityLevel.DEGRADED else 3
-        # Heavy perturbations (blur, noise, jpeg) - max 1 of these for DEGRADED, max 2 for SEVERE
-        max_heavy = 1 if quality == QualityLevel.DEGRADED else 2
+        # For SEVERE: all 3 perturbations always applied
+        # For DEGRADED: each perturbation applied by probability
+        if quality == QualityLevel.SEVERE:
+            # Always apply all 3 for SEVERE
+            to_apply = {"blur": True, "rotation": True, "contrast": True}
+        else:
+            # DEGRADED: apply by probability, but ensure at least 1
+            to_apply = {
+                "blur": random.random() < PERTURBATION_PROBABILITIES["blur"],
+                "rotation": random.random() < PERTURBATION_PROBABILITIES["rotation"],
+                "contrast": random.random() < PERTURBATION_PROBABILITIES["contrast"],
+            }
+            # Ensure at least one perturbation for DEGRADED
+            if not any(to_apply.values()):
+                to_apply[random.choice(["blur", "rotation", "contrast"])] = True
         
-        applied_count = 0
-        heavy_count = 0
-        
-        # Decide which perturbations to apply (pre-calculate to respect limits)
-        # For SEVERE: blur is always applied (most visible perturbation)
-        to_apply = {
-            "rotation": random.random() < PERTURBATION_PROBABILITIES["rotation"],
-            "blur": True if quality == QualityLevel.SEVERE else random.random() < PERTURBATION_PROBABILITIES["blur"],
-            "brightness": random.random() < PERTURBATION_PROBABILITIES["brightness"],
-            "contrast": random.random() < PERTURBATION_PROBABILITIES["contrast"],
-            "noise": random.random() < PERTURBATION_PROBABILITIES["noise"],
-            "jpeg": random.random() < PERTURBATION_PROBABILITIES["jpeg"],
-        }
-        
-        # Apply perturbations with limits
-        
-        # 1. Rotation (not heavy)
-        if to_apply["rotation"] and applied_count < max_perturbations:
+        # 1. Rotation (apply first)
+        if to_apply["rotation"]:
             angle = self._get_random_param(ranges["rotation_angle"])
             image = apply_rotation(image, angle, fill_color=bg_color)
             params.rotation_angle = round(angle, 2)
-            applied_count += 1
         
-        # 2. Blur (heavy)
-        if to_apply["blur"] and applied_count < max_perturbations and heavy_count < max_heavy:
+        # 2. Blur
+        if to_apply["blur"]:
             radius = self._get_random_param(ranges["blur_radius"])
             image = apply_gaussian_blur(image, radius)
             params.blur_radius = round(radius, 2)
-            applied_count += 1
-            heavy_count += 1
         
-        # 3. Brightness (not heavy)
-        if to_apply["brightness"] and applied_count < max_perturbations:
-            factor = self._get_random_param(ranges["brightness_factor"])
-            image = apply_brightness(image, factor)
-            params.brightness_factor = round(factor, 2)
-            applied_count += 1
-        
-        # 4. Contrast (not heavy)
-        if to_apply["contrast"] and applied_count < max_perturbations:
+        # 3. Contrast (apply last)
+        if to_apply["contrast"]:
             factor = self._get_random_param(ranges["contrast_factor"])
             image = apply_contrast(image, factor)
             params.contrast_factor = round(factor, 2)
-            applied_count += 1
-        
-        # 5. Noise (heavy)
-        if to_apply["noise"] and applied_count < max_perturbations and heavy_count < max_heavy:
-            sigma = int(self._get_random_param(ranges["noise_sigma"]))
-            image = apply_gaussian_noise(image, sigma)
-            params.noise_sigma = sigma
-            applied_count += 1
-            heavy_count += 1
-        
-        # 6. JPEG compression (heavy)
-        if to_apply["jpeg"] and applied_count < max_perturbations and heavy_count < max_heavy:
-            quality_val = int(self._get_random_param(ranges["jpeg_quality"]))
-            image = apply_jpeg_compression(image, quality_val)
-            params.jpeg_quality = quality_val
-            applied_count += 1
-            heavy_count += 1
-        
-        # Force at least one perturbation for DEGRADED/SEVERE
-        if applied_count == 0:
-            # Pick a random perturbation to apply
-            perturbation = random.choice(["blur", "noise", "brightness"])
-            
-            if perturbation == "blur":
-                radius = self._get_random_param(ranges["blur_radius"])
-                image = apply_gaussian_blur(image, radius)
-                params.blur_radius = round(radius, 2)
-            elif perturbation == "noise":
-                sigma = int(self._get_random_param(ranges["noise_sigma"]))
-                image = apply_gaussian_noise(image, sigma)
-                params.noise_sigma = sigma
-            elif perturbation == "brightness":
-                factor = self._get_random_param(ranges["brightness_factor"])
-                image = apply_brightness(image, factor)
-                params.brightness_factor = round(factor, 2)
         
         return image, params
 
