@@ -48,6 +48,13 @@ class DaFontScraper:
             'Scripty',                   # Falta glif coma
             'Barethelly_Signature',      # Watermark "Din Studio"
             'Barethelly Signature',
+            'Arsenale_White',            # Watermark "PERSONAL USE ONLY - ZETAFONTS.COM"
+            'Arsenale White',
+            'Nowyal',                    # Glifs faltants / watermark
+            'Vítkova_písanka',           # Watermark "personal use only - fonty.cendik.ca"
+            'Vítkova písanka',
+            'Cursif',                    # Glifs buits per ó/ò
+            'Ecolier',                   # Glifs buits per ó/ò
         ]
 
     def _load_language_configs(self, languages=None):
@@ -112,8 +119,8 @@ class DaFontScraper:
 
     def _check_for_watermark(self, font_data):
         """
-        Detecta si una font té watermark generant una imatge de prova.
-        Els watermarks sovint apareixen als espais o puntuació.
+        Detecta si una font té watermark generant imatges de prova.
+        Els watermarks sovint apareixen als espais, números o puntuació.
         Retorna (has_watermark, reason).
         """
         try:
@@ -121,34 +128,23 @@ class DaFontScraper:
             font_size = 40
             pil_font = ImageFont.truetype(io.BytesIO(font_data), font_size)
             
-            # Text de prova amb espais (on sovint s'amaguen watermarks)
+            # Test 1: Text amb espais (on sovint s'amaguen watermarks)
             test_text = "A B C D E"
-            
-            # Crear imatge
             img = Image.new('RGB', (600, 80), 'white')
             draw = ImageDraw.Draw(img)
             draw.text((10, 15), test_text, font=pil_font, fill='black')
             
-            # Analitzar: comptar píxels foscos
             gray = img.convert('L')
             pixels = list(gray.getdata())
             dark_pixels = sum(1 for p in pixels if p < 180)
-            
-            # Calcular ràtio
-            # "A B C D E" té 5 lletres, els espais no haurien de tenir píxels
-            # Si hi ha masses píxels foscos, probablement hi ha watermark als espais
-            expected_chars = 5
             total_pixels = len(pixels)
             dark_ratio = dark_pixels / total_pixels
             
-            # Threshold: si el ràtio és molt alt pel nombre de caràcters
-            # Una font normal amb 5 lletres tindria ~1-3% píxels foscos
-            # Si en té >8%, sospitós (watermark als espais)
             if dark_ratio > 0.08:
-                return True, f"Massa píxels foscos ({dark_ratio:.1%}), possible watermark"
+                return True, f"Test 1 (espais): massa píxels foscos ({dark_ratio:.1%})"
             
-            # Segon test: text més llarg per detectar watermarks repetitius
-            test_text2 = "Hello, World! Test 123."
+            # Test 2: Números (molts watermarks apareixen amb números)
+            test_text2 = "1 2 3 4 5 6 7 8 9 0"
             img2 = Image.new('RGB', (800, 80), 'white')
             draw2 = ImageDraw.Draw(img2)
             draw2.text((10, 15), test_text2, font=pil_font, fill='black')
@@ -158,16 +154,65 @@ class DaFontScraper:
             dark_pixels2 = sum(1 for p in pixels2 if p < 180)
             dark_ratio2 = dark_pixels2 / len(pixels2)
             
-            # Amb més text, el ràtio hauria de ser similar o lleugerament més alt
-            # Si és molt més alt, hi ha contingut extra (watermark)
-            if dark_ratio2 > 0.12:
-                return True, f"Contingut extra detectat ({dark_ratio2:.1%})"
+            if dark_ratio2 > 0.10:
+                return True, f"Test 2 (números): massa píxels foscos ({dark_ratio2:.1%})"
+            
+            # Test 3: Espais llargs (detectar watermarks repetitius)
+            test_text3 = "A          B          C"
+            img3 = Image.new('RGB', (900, 80), 'white')
+            draw3 = ImageDraw.Draw(img3)
+            draw3.text((10, 15), test_text3, font=pil_font, fill='black')
+            
+            gray3 = img3.convert('L')
+            pixels3 = list(gray3.getdata())
+            dark_pixels3 = sum(1 for p in pixels3 if p < 180)
+            dark_ratio3 = dark_pixels3 / len(pixels3)
+            
+            # Amb només 3 lletres i molts espais, hauria de tenir molt pocs píxels foscos
+            if dark_ratio3 > 0.04:
+                return True, f"Test 3 (espais llargs): contingut als espais ({dark_ratio3:.1%})"
+            
+            # Test 4: Text llarg per detectar watermarks petits repetitius
+            test_text4 = "Hello, World! Test 123. The quick brown fox."
+            img4 = Image.new('RGB', (1200, 80), 'white')
+            draw4 = ImageDraw.Draw(img4)
+            draw4.text((10, 15), test_text4, font=pil_font, fill='black')
+            
+            gray4 = img4.convert('L')
+            pixels4 = list(gray4.getdata())
+            dark_pixels4 = sum(1 for p in pixels4 if p < 180)
+            dark_ratio4 = dark_pixels4 / len(pixels4)
+            
+            if dark_ratio4 > 0.12:
+                return True, f"Test 4 (text llarg): contingut extra ({dark_ratio4:.1%})"
             
             return False, "OK"
             
         except Exception as e:
-            # Si no podem comprovar, assumim OK (millor falsos negatius que rebutjar bones fonts)
+            # Si no podem comprovar, assumim OK
             return False, f"No verificat: {e}"
+
+    def _glyph_renders_correctly(self, font_data, char, font_size=40):
+        """
+        Verifica que un caràcter es renderitza correctament (no és un glif buit).
+        Algunes fonts declaren suportar un caràcter al cmap però el glif està buit.
+        """
+        try:
+            pil_font = ImageFont.truetype(io.BytesIO(font_data), font_size)
+            
+            # Crear imatge petita per renderitzar el caràcter
+            img = Image.new('L', (60, 60), 255)  # Fons blanc
+            draw = ImageDraw.Draw(img)
+            draw.text((10, 10), char, font=pil_font, fill=0)  # Text negre
+            
+            # Comptar píxels foscos
+            dark_pixels = sum(1 for p in img.getdata() if p < 200)
+            
+            # Si té menys de 5 píxels foscos, el glif és buit o quasi invisible
+            return dark_pixels >= 5
+            
+        except Exception:
+            return False
 
     def get_page(self, url):
         """Fetch a page with error handling"""
@@ -365,12 +410,18 @@ class DaFontScraper:
             
             all_present = True
             missing = []
+            empty_glyphs = []
             
             for char in required_chars:
                 cp = ord(char)
                 if cp not in cmap:
                     all_present = False
                     missing.append(char)
+                else:
+                    # Verificar que el glif es renderitza (no és buit)
+                    if not self._glyph_renders_correctly(font_data, char):
+                        all_present = False
+                        empty_glyphs.append(char)
             
             if all_present:
                 supported_languages.append(lang)
@@ -378,7 +429,10 @@ class DaFontScraper:
                     print(f"      [OK] Suporta {lang}")
             else:
                 if self.verbose:
-                    print(f"      [X] {lang}: falten {', '.join(missing[:5])}{'...' if len(missing) > 5 else ''}")
+                    if missing:
+                        print(f"      [X] {lang}: falten {', '.join(missing[:5])}{'...' if len(missing) > 5 else ''}")
+                    if empty_glyphs:
+                        print(f"      [X] {lang}: glifs buits {', '.join(empty_glyphs[:5])}{'...' if len(empty_glyphs) > 5 else ''}")
 
         # Si la font suporta algun idioma, comprovar watermarks
         if supported_languages:

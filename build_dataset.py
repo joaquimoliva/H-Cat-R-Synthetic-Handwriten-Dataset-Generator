@@ -19,6 +19,12 @@ from tqdm import tqdm
 import multiprocessing as mp
 from functools import partial
 import platform
+# Suprimir warnings de fontTools sobre timestamps
+import warnings
+import logging
+warnings.filterwarnings('ignore', module='fontTools')
+logging.getLogger('fontTools').setLevel(logging.ERROR)
+
 from fontTools.ttLib import TTFont
 
 # Import perturbation module
@@ -29,23 +35,142 @@ from apply_perturbations import PerturbationPipeline, QualityLevel
 # FUNCIONES DE VERIFICACIÓN DE FUENTES
 # ============================================================================
 
-def _font_supports_text(font_path, text):
+def _is_rectangle_glyph(glyph):
     """
-    Verifica si una fuente soporta todos los caracteres de un texto.
-    Retorna True si soporta todos, False si falta alguno.
+    Detecta si un glif és un rectangle placeholder.
+    Els rectangles placeholders tenen 2 contorns amb 4 punts cadascun formant rectangles.
+    """
+    if not hasattr(glyph, 'numberOfContours') or not hasattr(glyph, 'coordinates'):
+        return False
+    
+    # Els rectangles típicament tenen 2 contorns (exterior i interior)
+    if glyph.numberOfContours != 2:
+        return False
+    
+    coords = list(glyph.coordinates)
+    
+    # Necessitem almenys 8 punts (4 per cada rectangle)
+    if len(coords) < 8:
+        return False
+    
+    # Verificar si els primers 4 punts formen un rectangle
+    # Un rectangle té: x1,y1 → x1,y2 → x2,y2 → x2,y1 (o similar)
+    def is_rectangle(points):
+        if len(points) < 4:
+            return False
+        # Obtenir els 4 primers punts
+        p = points[:4]
+        xs = sorted(set(pt[0] for pt in p))
+        ys = sorted(set(pt[1] for pt in p))
+        # Un rectangle té exactament 2 valors X i 2 valors Y únics
+        return len(xs) == 2 and len(ys) == 2
+    
+    # Comprovar primer contorn (primers ~4 punts)
+    if is_rectangle(coords[:4]):
+        return True
+    
+    # Alguns rectangles poden tenir més punts per contorn
+    # Verificar proporció d'aspecte molt rectangular
+    if hasattr(glyph, 'xMin') and hasattr(glyph, 'xMax'):
+        width = glyph.xMax - glyph.xMin
+        height = glyph.yMax - glyph.yMin
+        if width > 0 and height > 0:
+            # Un rectangle placeholder típicament és molt alt i estret o té proporcions específiques
+            # I té poques coordenades per la seva mida (un glif real de lletra té moltes més)
+            coords_per_area = len(coords) / (width * height) * 1000000
+            # Un rectangle simple té ~8 coordenades, una lletra real en té moltes més
+            if len(coords) <= 12 and glyph.numberOfContours == 2:
+                return True
+    
+    return False
+
+
+def _glyph_exists_in_font(font_path, char):
+    """
+    Verifica que un caràcter té un glif REAL a la font (no .notdef/rectangle placeholder).
+    Comprova directament al cmap i glyf, i detecta rectangles placeholder.
     """
     try:
         font = TTFont(font_path)
         cmap = font.getBestCmap()
+        
         if cmap is None:
             return False
         
+        codepoint = ord(char)
+        
+        # Verificar si el codepoint existeix al cmap
+        if codepoint not in cmap:
+            return False
+        
+        # Obtenir el nom del glif associat a aquest codepoint
+        glyph_name = cmap[codepoint]
+        
+        # Si el glif és .notdef, no existeix realment
+        if glyph_name == '.notdef':
+            return False
+        
+        # Verificar que el glif té contorns (no és buit) i no és un rectangle
+        if 'glyf' in font:
+            glyf_table = font['glyf']
+            
+            if glyph_name not in glyf_table:
+                return False
+                
+            glyph = glyf_table[glyph_name]
+            
+            # Un glif buit no té contorns
+            if hasattr(glyph, 'numberOfContours'):
+                if glyph.numberOfContours == 0:
+                    return False
+                if glyph.numberOfContours == -1:
+                    if not hasattr(glyph, 'components') or not glyph.components:
+                        return False
+            
+            # Detectar rectangle placeholder
+            if _is_rectangle_glyph(glyph):
+                return False
+                                
+        elif 'CFF ' in font:
+            cff = font['CFF ']
+            if hasattr(cff, 'cff') and len(cff.cff) > 0:
+                top_dict = cff.cff[0]
+                if hasattr(top_dict, 'CharStrings'):
+                    if glyph_name not in top_dict.CharStrings:
+                        return False
+        
+        return True
+        
+    except Exception:
+        return False
+
+
+# Cache per verificació de glifs
+_glyph_exists_cache = {}
+
+def _check_glyph_exists_cached(font_path, char):
+    """Versió amb cache de la verificació de glifs."""
+    cache_key = (str(font_path), char)
+    if cache_key not in _glyph_exists_cache:
+        _glyph_exists_cache[cache_key] = _glyph_exists_in_font(font_path, char)
+    return _glyph_exists_cache[cache_key]
+
+
+def _font_supports_text(font_path, text):
+    """
+    Verifica si una fuente soporta todos los caracteres de un texto.
+    Comprova que els glifs existeixen realment (no són .notdef/rectangles).
+    Retorna True si soporta todos, False si falta alguno.
+    """
+    try:
         for char in text:
             if char.isspace():
-                continue  # Ignorar espacios
-            codepoint = ord(char)
-            if codepoint not in cmap:
+                continue
+            
+            # Verificar que el glif existeix realment (no és .notdef)
+            if not _check_glyph_exists_cached(font_path, char):
                 return False
+                    
         return True
     except Exception:
         return False
@@ -171,7 +296,8 @@ def _generate_single_image(task, target_height=128):
         metadata_entry = {
             'file_name': img_filename,
             'text': text,
-            'text_length': len(text),
+            'char_count': len(text),
+            'word_count': len(text.split()),
             'language': task.get('language', 'unknown'),
             'font_name': task['font_info']['name'],
             'font_category': task['font_info']['category'],
@@ -255,7 +381,7 @@ def _font_supports_chars(font_path, required_chars):
 
 class SyntheticDatasetBuilder:
     def __init__(self, data_dir='data', fonts_dir='fonts', output_dir='output',
-                 mode='lines', style='normal', verbose=False,
+                 mode='lines', mode_distribution=None, style='normal', verbose=False,
                  train_split=0.8, val_split=0.1, num_workers=1, max_fonts_per_category=None,
                  category_filter=None, backgrounds_dir=None,
                  background_color=None, background_type=None,
@@ -265,7 +391,24 @@ class SyntheticDatasetBuilder:
         self.data_dir = data_dir
         self.fonts_dir = Path(fonts_dir)
         self.output_dir = Path(output_dir)
-        self.mode = mode
+        
+        # Processar modes (pot ser 'lines', 'words', o 'lines,words')
+        self.modes = [m.strip() for m in mode.split(',')]
+        if len(self.modes) == 1:
+            self.mode_distribution = [100]
+        elif mode_distribution:
+            self.mode_distribution = [int(x) for x in mode_distribution.split(',')]
+        else:
+            # Per defecte 50/50 si hi ha dos modes
+            self.mode_distribution = [50] * len(self.modes)
+        
+        # Normalitzar distribució per assegurar que suma 100
+        total = sum(self.mode_distribution)
+        self.mode_distribution = [d / total for d in self.mode_distribution]
+        
+        # Per compatibilitat amb codi existent
+        self.mode = self.modes[0]
+        
         self.style = style
         self.verbose = verbose
         self.num_workers = num_workers
@@ -334,6 +477,19 @@ class SyntheticDatasetBuilder:
 
         self.fonts = []
         self.texts = []
+
+    def _select_mode_for_item(self):
+        """Selecciona el mode per una imatge segons la distribució configurada."""
+        if len(self.modes) == 1:
+            return self.modes[0]
+        
+        r = random.random()
+        cumulative = 0
+        for mode, prob in zip(self.modes, self.mode_distribution):
+            cumulative += prob
+            if r < cumulative:
+                return mode
+        return self.modes[-1]
 
     def _load_backgrounds(self):
         """Carrega les imatges de fons disponibles filtrant per color i tipus"""
@@ -884,17 +1040,34 @@ class SyntheticDatasetBuilder:
         val_metadata = []
         test_metadata = []
 
-        # Calcular total_items tenint en compte fonts per idioma
+        # Calcular total_items tenint en compte fonts per idioma i modes mixtos
         total_items = 0
+        
+        # Determinar probabilitat de mode 'words'
+        words_prob = 0
+        for mode, prob in zip(self.modes, self.mode_distribution):
+            if mode == 'words':
+                words_prob = prob
+                break
+        
         for td in texts_to_use:
             text_lang = td.get('language', self.languages[0] if self.languages else 'unknown')
             num_fonts = len(self.fonts_by_lang.get(text_lang, self.fonts))
-            if self.mode == 'words':
-                total_items += len(td['text'].split()) * num_fonts
+            
+            if len(self.modes) == 1:
+                # Mode únic
+                if self.modes[0] == 'words':
+                    total_items += len(td['text'].split()) * num_fonts
+                else:
+                    total_items += num_fonts
             else:
-                total_items += num_fonts
+                # Modes mixtos: estimar basant-se en distribució
+                num_words = len(td['text'].split())
+                lines_contrib = (1 - words_prob) * num_fonts
+                words_contrib = words_prob * num_words * num_fonts
+                total_items += int(lines_contrib + words_contrib)
 
-        print(f"  Total imágenes esperadas: {total_items:,}")
+        print(f"  Total imágenes esperadas: {total_items:,} (estimat)")
 
         if self.num_workers > 1:
             self._generate_dataset_parallel(
@@ -956,7 +1129,10 @@ class SyntheticDatasetBuilder:
                 if not compatible_fonts:
                     continue
                 
-                if self.mode == 'words':
+                # Seleccionar mode per aquest text
+                current_mode = self._select_mode_for_item()
+                
+                if current_mode == 'words':
                     words = text.split()
                     if not words:
                         continue
@@ -988,7 +1164,7 @@ class SyntheticDatasetBuilder:
                                 'style': font_info['style']
                             },
                             'background': bg_data,
-                            'mode': self.mode,
+                            'mode': current_mode,
                             'split_name': split_name,
                             'perturbation_config': perturbation_config,
                             'language': text_data.get('language', self.language)
@@ -1079,7 +1255,10 @@ class SyntheticDatasetBuilder:
                     if not compatible_fonts:
                         continue
                     
-                    if self.mode == 'words':
+                    # Seleccionar mode per aquest text
+                    current_mode = self._select_mode_for_item()
+                    
+                    if current_mode == 'words':
                         words = text.split()
                         if not words:
                             continue
@@ -1132,13 +1311,16 @@ class SyntheticDatasetBuilder:
                             metadata_entry = {
                                 'file_name': img_filename,
                                 'text': text_to_render,
+                                'char_count': len(text_to_render),
+                                'word_count': len(text_to_render.split()),
+                                'language': text_data.get('language', self.languages[0] if self.languages else 'unknown'),
                                 'font_name': font_info['name'],
                                 'font_category': font_info['category'],
                                 'font_style': font_info['style'],
                                 'source_book': text_data['book'],
                                 'background_type': bg_type,
                                 'background_color': bg_color,
-                                'mode': self.mode,
+                                'mode': current_mode,
                                 'quality': perturb_metadata.get('quality', 'clean'),
                             }
                             
@@ -1228,7 +1410,11 @@ class SyntheticDatasetBuilder:
         print("\n" + "=" * 60)
         print("RESUMEN DE GENERACIÓN - FORMATO HUGGINGFACE")
         print("=" * 60)
-        print(f"Modo: {self.mode}")
+        if len(self.modes) > 1:
+            mode_dist_str = ', '.join([f"{m}:{int(d*100)}%" for m, d in zip(self.modes, self.mode_distribution)])
+            print(f"Modo: {', '.join(self.modes)} (distribució: {mode_dist_str})")
+        else:
+            print(f"Modo: {self.modes[0]}")
         print(f"Estilo: {self.style}")
         print(f"\nFuentes:")
         print(f"  Con bold: {self.stats['fonts_with_bold']}")
@@ -1294,8 +1480,10 @@ def main():
     parser.add_argument('--output-dir', default='output', help='Directorio base de salida (default: output)')
     parser.add_argument('--output-name', default=None, help='Nombre personalizado para el output')
     parser.add_argument('--language', default='unknown', help='Idioma del dataset (default: unknown)')
-    parser.add_argument('--mode', choices=['lines', 'words'], default='lines',
-                        help='Modo: lines (frases) o words (palabras) (default: lines)')
+    parser.add_argument('--mode', type=str, default='lines',
+                        help='Mode(s): lines, words, o lines,words per ambdós (default: lines)')
+    parser.add_argument('--mode-distribution', type=str, default=None,
+                        help='Distribució de modes en %% (ex: 70,30). Per defecte 50,50 si es passen dos modes')
     parser.add_argument('--style', choices=['normal', 'bold'], default='normal',
                         help='Estilo de fuente: normal o bold (default: normal)')
     parser.add_argument('--train-split', type=float, default=0.8,
@@ -1376,6 +1564,7 @@ def main():
         fonts_dir=args.fonts_dir,
         output_dir=output_dir,
         mode=args.mode,
+        mode_distribution=args.mode_distribution,
         style=args.style,
         train_split=args.train_split,
         val_split=args.val_split,

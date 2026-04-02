@@ -9,3 +9,9 @@ data_backup/
 verificacio.txt 
 compatible_fonts.csv 
 backgrounds/ 
+"test_font.py" 
+"test_rectangle_filter.py" 
+"analyze_glyphs.py" 
+"test_font.py" 
+"test_rectangle_filter.py" 
+"analyze_glyphs.py" 

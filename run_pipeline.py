@@ -90,8 +90,6 @@ Exemples:
                         help='Idioma/es separats per comes (ex: catalan o catalan,spanish,french)')
     parser.add_argument('--verbose', '-v', action='store_true',
                         help='Mostrar informació detallada')
-    parser.add_argument('--clean-output', action='store_true',
-                        help='Esborrar la carpeta output abans de generar')
 
     # Control de passos
     parser.add_argument('--skip-text', action='store_true',
@@ -126,8 +124,10 @@ Exemples:
                         help='Distribució de qualitat: clean,degraded,severe en %% (default: 40,40,20)')
 
     # Paràmetres de generació
-    parser.add_argument('--mode', choices=['lines', 'words'], default='lines',
-                        help='Mode de generació: lines o words (default: lines)')
+    parser.add_argument('--mode', type=str, default='lines',
+                        help='Mode(s) de generació: lines, words, o lines,words per ambdós')
+    parser.add_argument('--mode-distribution', type=str, default=None,
+                        help='Distribució de modes en %% (ex: 70,30 per 70%% lines, 30%% words)')
     parser.add_argument('--style', choices=['normal', 'bold'], default='normal',
                         help='Estil de font (default: normal)')
     parser.add_argument('--category-filter', type=str, default='Handwritten',
@@ -201,7 +201,12 @@ Exemples:
     else:
         print(f"  Idiomes: {', '.join(languages)} ({len(languages)} idiomes)")
     print(f"  Font de textos: {args.text_source}")
-    print(f"  Mode: {args.mode}")
+    mode_str = args.mode
+    if ',' in args.mode and args.mode_distribution:
+        mode_str += f" (distribució: {args.mode_distribution})"
+    elif ',' in args.mode:
+        mode_str += " (distribució: 50,50)"
+    print(f"  Mode: {mode_str}")
     print(f"  Categoria fonts: {args.category_filter}")
     if args.no_backgrounds:
         print(f"  Fons: desactivats (només blanc llis)")
@@ -355,8 +360,9 @@ Exemples:
         if args.output_name:
             output_dir = f'output_{args.output_name}'
 
-        if args.clean_output and Path(output_dir).exists():
-            print(f"\n  [CLEAN] Esborrant {output_dir}/...")
+        # Sempre eliminar carpeta existent per evitar barrejar imatges
+        if Path(output_dir).exists():
+            print(f"\n  [CLEAN] Esborrant {output_dir}/ per evitar barrejar imatges...")
             shutil.rmtree(output_dir)
 
         # Construir llista de directoris de dades i idiomes
@@ -378,6 +384,9 @@ Exemples:
             '--style', args.style,
             '--workers', str(args.workers),
         ] + verbose_flag
+
+        if args.mode_distribution:
+            cmd.extend(['--mode-distribution', args.mode_distribution])
 
         if args.category_filter:
             cmd.extend(['--category-filter', args.category_filter])
