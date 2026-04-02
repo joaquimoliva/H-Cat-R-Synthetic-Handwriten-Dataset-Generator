@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Script para descargar textos de Wikipedia en cualquier idioma
-mediante la API de MediaWiki.
-Objetivo: Crear corpus de texto para dataset sintético de escritura manuscrita.
-Compatible con el pipeline de build_dataset.py
+Script to download Wikipedia texts in any language
+using the MediaWiki API.
+Goal: Create text corpus for synthetic handwriting dataset.
+Compatible with build_dataset.py pipeline
 """
 
 import requests
@@ -26,17 +26,17 @@ class WikipediaScraper:
             'User-Agent': 'SyntheticHTRDatasetGenerator/1.0 (Research project; contact@university.edu)'
         }
 
-        # Crear directorio de salida
+        # Create output directory
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
     def get_random_articles(self, count=20):
-        """Obtiene una lista de artículos aleatorios"""
+        """Get a list of random articles"""
         params = {
             'action': 'query',
             'format': 'json',
             'list': 'random',
-            'rnnamespace': 0,  # Solo artículos (namespace 0)
-            'rnlimit': min(count, 20)  # API limita a 20 por petición
+            'rnnamespace': 0,  # Articles only (namespace 0)
+            'rnlimit': min(count, 20)  # API limits to 20 per request
         }
 
         articles = []
@@ -69,7 +69,7 @@ class WikipediaScraper:
         return articles
 
     def get_articles_from_category(self, category, max_articles=100):
-        """Obtiene artículos de una categoría específica"""
+        """Get articles from a specific category"""
         params = {
             'action': 'query',
             'format': 'json',
@@ -96,7 +96,7 @@ class WikipediaScraper:
                         'id': member['pageid']
                     })
 
-                # Comprobar si hay más páginas
+                # Check if there are more pages
                 if 'continue' in data and len(articles) < max_articles:
                     params['cmcontinue'] = data['continue']['cmcontinue']
                     time.sleep(self.delay)
@@ -110,13 +110,13 @@ class WikipediaScraper:
         return articles[:max_articles]
 
     def get_article_text(self, title):
-        """Extrae el texto limpio de un artículo usando la API"""
+        """Extract clean text from article using API"""
         params = {
             'action': 'query',
             'format': 'json',
             'titles': title,
             'prop': 'extracts',
-            'explaintext': True,  # Texto plano, sin HTML
+            'explaintext': True,  # Plain text, no HTML
             'exsectionformat': 'plain'
         }
 
@@ -137,7 +137,7 @@ class WikipediaScraper:
                 if not text:
                     return None
 
-                # Limpiar texto
+                # Clean text
                 text = self._clean_text(text)
 
                 lines = [line.strip() for line in text.split('\n') if line.strip()]
@@ -158,8 +158,8 @@ class WikipediaScraper:
             return None
 
     def _clean_text(self, text):
-        """Limpia el texto extraído de Wikipedia"""
-        # Eliminar secciones no deseadas
+        """Clean text extracted from Wikipedia"""
+        # Remove unwanted sections
         sections_to_remove = [
             'Referències', 'References', 'Bibliografía', 'Bibliography',
             'Enllaços externs', 'External links', 'Enlaces externos',
@@ -173,26 +173,26 @@ class WikipediaScraper:
             pattern = rf'==\s*{re.escape(section)}\s*==.*'
             text = re.split(pattern, text, flags=re.IGNORECASE)[0]
 
-        # Eliminar encabezados de sección (== Título ==)
+        # Remove section headers (== Título ==)
         text = re.sub(r'={2,}.*?={2,}', '', text)
 
-        # Eliminar contenido entre llaves (plantillas residuales)
+        # Remove content in braces (residual templates)
         text = re.sub(r'\{[^}]*\}', '', text)
 
-        # Eliminar contenido entre corchetes (coordenadas, refs)
+        # Remove content in brackets (coordinates, refs)
         text = re.sub(r'\[[^\]]*\]', '', text)
 
-        # Eliminar URLs
+        # Remove URLs
         text = re.sub(r'https?://\S+', '', text)
 
-        # Eliminar líneas que sean solo números (tablas residuales)
+        # Remove lines that are only numbers (residual tables)
         text = re.sub(r'^[\d\s.,]+$', '', text, flags=re.MULTILINE)
 
-        # Eliminar líneas muy cortas (< 10 caracteres) que suelen ser residuos
+        # Remove very short lines (< 10 chars) that are usually residue
         lines = text.split('\n')
         lines = [line.strip() for line in lines if len(line.strip()) >= 10]
 
-        # Eliminar líneas duplicadas consecutivas
+        # Remove consecutive duplicate lines
         cleaned_lines = []
         for line in lines:
             if not cleaned_lines or line != cleaned_lines[-1]:
@@ -201,7 +201,7 @@ class WikipediaScraper:
         return '\n'.join(cleaned_lines)
 
     def sanitize_filename(self, filename):
-        """Sanitiza el nombre del archivo"""
+        """Sanitize filename"""
         filename = re.sub(r'[<>:"/\\|?*]', '_', filename)
         filename = re.sub(r'\s+', '_', filename)
         if len(filename) > 200:
@@ -209,15 +209,15 @@ class WikipediaScraper:
         return filename
 
     def save_content(self, article_title, content, article_index):
-        """Guarda el contenido extraído en el mismo formato que scrape_wikisource"""
+        """Save extracted content in same format as scrape_wikisource"""
         safe_name = self.sanitize_filename(article_title)
 
-        # Guardar como texto plano
+        # Save as plain text
         txt_file = self.output_dir / f"{article_index:04d}_{safe_name}.txt"
         with open(txt_file, 'w', encoding='utf-8') as f:
             f.write(content['text'])
 
-        # Guardar metadatos como JSON
+        # Save metadata as JSON
         json_file = self.output_dir / f"{article_index:04d}_{safe_name}.json"
         metadata = {
             'article_title': article_title,
@@ -231,34 +231,34 @@ class WikipediaScraper:
             json.dump(metadata, f, ensure_ascii=False, indent=2)
 
         if self.verbose:
-            print(f"    [SAVED] {txt_file.name} ({content['num_lines']} líneas, {content['num_words']} palabras)")
+            print(f"    [SAVED] {txt_file.name} ({content['num_lines']} lines, {content['num_words']} words)")
 
     def scrape_all(self, max_articles=100, category=None):
-        """Scraping completo de Wikipedia"""
+        """Complete Wikipedia scraping"""
         print("=" * 60)
-        print(f"WIKIPEDIA ({self.language.upper()}) - SCRAPER DE ARTÍCULOS")
+        print(f"WIKIPEDIA ({self.language.upper()}) - ARTICLE SCRAPER")
         print("=" * 60)
-        print(f"  Idioma: {self.language}")
-        print(f"  Artículos máximos: {max_articles}")
+        print(f"  Language: {self.language}")
+        print(f"  Max articles: {max_articles}")
         if category:
-            print(f"  Categoría: {category}")
+            print(f"  Category: {category}")
         print()
 
-        # Obtener lista de artículos
+        # Obtener lista de articles
         if category:
-            print(f"[1] Obteniendo artículos de la categoría '{category}'...")
+            print(f"[1] Getting articles from category '{category}'...")
             articles = self.get_articles_from_category(category, max_articles)
         else:
-            print(f"[1] Obteniendo {max_articles} artículos aleatorios...")
+            print(f"[1] Getting {max_articles} random articles...")
             articles = self.get_random_articles(max_articles)
 
         if not articles:
-            print("[ERROR] No se encontraron artículos")
+            print("[ERROR] No articles found")
             return
 
-        print(f"  [OK] Encontrados {len(articles)} artículos")
+        print(f"  [OK] Found {len(articles)} articles")
 
-        print(f"\n[2] Procesando artículos...")
+        print(f"\n[2] Procesando articles...")
         print("=" * 60)
 
         total_articles = 0
@@ -266,7 +266,7 @@ class WikipediaScraper:
         total_words = 0
 
         for idx, article in enumerate(articles, 1):
-            print(f"\n[{idx}/{len(articles)}] Artículo: {article['title']}")
+            print(f"\n[{idx}/{len(articles)}] Article: {article['title']}")
 
             # Extraer contenido
             content = self.get_article_text(article['title'])
@@ -279,39 +279,39 @@ class WikipediaScraper:
                 total_words += content['num_words']
             else:
                 if self.verbose:
-                    print(f"    [SKIP] Sin contenido suficiente")
+                    print(f"    [SKIP] Insufficient content")
 
             # Delay entre peticiones
             time.sleep(self.delay)
 
         # Resumen final
         print("\n" + "=" * 60)
-        print("RESUMEN FINAL")
+        print("FINAL SUMMARY")
         print("=" * 60)
-        print(f"  Idioma: {self.language}")
-        print(f"  Artículos guardados: {total_articles}")
-        print(f"  Total líneas: {total_lines:,}")
-        print(f"  Total palabras: {total_words:,}")
-        print(f"\n[SUCCESS] Textos guardados en: {self.output_dir.absolute()}")
+        print(f"  Language: {self.language}")
+        print(f"  Articles saved: {total_articles}")
+        print(f"  Total lines: {total_lines:,}")
+        print(f"  Total words: {total_words:,}")
+        print(f"\n[SUCCESS] Texts saved in: {self.output_dir.absolute()}")
         print()
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description='Scraper de Wikipedia para crear corpus de texto multilingüe'
+        description='Wikipedia scraper to create multilingual text corpus'
     )
     parser.add_argument('--language', '-l', default='ca',
-                        help='Código de idioma (default: ca). Ejemplos: ca, es, eu, gl, en, fr, de, it')
+                        help='Language code (default: ca). Examples: ca, es, eu, gl, en, fr, de, it')
     parser.add_argument('--output-dir', default='data',
-                        help='Directorio base de salida (default: data). Se crea subcarpeta wikipedia_[idioma]/')
+                        help='Base output directory (default: data). Subfolder created wikipedia_[idioma]/')
     parser.add_argument('--max-articles', type=int, default=100,
-                        help='Número máximo de artículos a descargar (default: 100)')
+                        help='Número máximo de articles a descargar (default: 100)')
     parser.add_argument('--category', type=str, default=None,
-                        help='Categoría de Wikipedia de la que obtener artículos (opcional)')
+                        help='Categoría de Wikipedia de la que obtener articles (opcional)')
     parser.add_argument('--delay', type=float, default=1.0,
-                        help='Delay entre requests en segundos (default: 1.0)')
+                        help='Delay between requests in seconds (default: 1.0)')
     parser.add_argument('--verbose', '-v', action='store_true',
-                        help='Mostrar información detallada')
+                        help='Show detailed information')
 
     args = parser.parse_args()
 

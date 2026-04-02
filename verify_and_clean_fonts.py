@@ -74,7 +74,7 @@ class FontVerifier:
         self.invalid_fonts = []  # Store info about invalid fonts
 
     def _load_language_config(self, language):
-        """Carrega la configuració de l'idioma des de languages/"""
+        """Load language configuration from languages/"""
         import json
         config_path = Path(__file__).parent / 'languages' / f'{language}.json'
         if config_path.exists():

@@ -1,747 +1,318 @@
-# Synthetic Catalan Handwriting Dataset Generator
+# Synthetic Handwriting Dataset Generator for HTR
 
-Synthetic text dataset generator for training OCR models.
+A Python framework for generating synthetic multilingual handwritten text datasets for Handwritten Text Recognition (HTR) training. The system automatically downloads texts from Wikipedia, scrapes handwriting fonts from DaFont, and generates realistic synthetic images with configurable perturbations.
 
-## 📋 Description
+## Features
 
-This project allows you to:
-- Generate a synthetic dataset in **HuggingFace** format
-- Parallel processing with multiple cores for acceleration
+- **Multilingual support:** 35 languages with Latin script
+- **Automatic font discovery:** Scrapes DaFont for handwriting fonts with character validation
+- **Realistic perturbations:** Blur, rotation, noise, contrast/brightness variations
+- **Multiple generation modes:** Full sentences (`lines`) or individual words (`words`)
+- **Paper backgrounds:** Grid, lined, and plain textures in multiple colors
+- **HuggingFace-compatible output:** Ready for ML training pipelines
 
-## 🗂️ Project Structure
-
-```
-.
-├── scrape_wikisource.py          # Wikisource text scraper
-├── scrape_dafont.py               # DaFont font scraper
-├── download_fonts.py              # Font downloader
-├── verify_and_clean_fonts.py     # Font verifier and cleaner
-├── verify_and_clean_books.py     # Text verifier and cleaner
-├── build_dataset.py               # Synthetic dataset generator
-├── test_font_rendering.py        # Font rendering test utility
-├── data/                          # Scraped texts (by book)
-├── fonts/                         # Downloaded fonts (by category)
-└── output/                        # Generated dataset
-    ├── train/
-    │   ├── 00000000.png
-    │   ├── ...
-    │   └── metadata.jsonl
-    ├── validation/
-    │   ├── 00000000.png
-    │   ├── ...
-    │   └── metadata.jsonl
-    ├── test/
-    │   ├── 00000000.png
-    │   ├── ...
-    │   └── metadata.jsonl
-    └── dataset_info.json
-```
-
-## 🚀 Installation
-
-### Prerequisites
-- Python 3.8+
-- pip
-
-### Install Dependencies
+## Requirements
 
 ```bash
-pip install -r requirements.txt
+pip install pillow fonttools tqdm requests beautifulsoup4
 ```
 
-Main libraries:
-- `Pillow` - Image generation
-- `requests` - Web scraping
-- `beautifulsoup4` - HTML parsing
-- `fontTools` - Font manipulation
-- `tqdm` - Progress bars
-- `datasets` - (Optional) For loading dataset with HuggingFace
-
-## 📖 Complete Workflow
-
-### 1. Scrape Texts from Wikisource
+## Quick Start
 
 ```bash
-# Scrape all validated books
-python scrape_wikisource.py -v
+# Generate a basic dataset
+python run_pipeline.py --language english --total-images 1000 -v
 
-# Scrape with limit
-python scrape_wikisource.py --max-books 10 -v
+# Multilingual dataset with perturbations
+python run_pipeline.py --language catalan,polish,romanian \
+    --total-images 3000 --perturbations -v
 
-# Start from a specific book (continue scraping)
-python scrape_wikisource.py --start-from-book "Tortosa" -v
-
-# Additional options
-python scrape_wikisource.py --output-dir data --delay 1.0 -v
+# Mixed modes (70% sentences, 30% words)
+python run_pipeline.py --language spanish \
+    --mode lines,words --mode-distribution 70,30 \
+    --total-images 2000 --perturbations -v
 ```
 
-**Parameters:**
-- `--output-dir`: Output directory (default: `data`)
-- `--max-books`: Maximum number of books to process
-- `--start-from-book`: Book title to start from (will scrape from the next one)
-- `--delay`: Delay between requests in seconds (default: 1.0)
-- `-v, --verbose`: Show detailed information
+## Pipeline Steps
 
----
+The pipeline executes 6 steps in order:
 
-### 2. Download Handwriting Fonts
+1. **Download texts** — Fetches text from Wikipedia/Wikisource API
+2. **Scan fonts** — Searches DaFont for compatible fonts
+3. **Download fonts** — Downloads font files (.ttf/.otf)
+4. **Verify fonts** — Validates character support and removes incompatible fonts
+5. **Generate backgrounds** — Creates paper texture images (if not existing)
+6. **Generate dataset** — Produces synthetic handwriting images with metadata
 
-```bash
-# Download fonts from DaFont (handwriting category)
-python download_fonts.py -v
+## Output Structure
 
-# Download with limit
-python download_fonts.py --max-pages 5 --max-fonts 50 -v
-
-# Additional options
-python download_fonts.py --output-dir fonts --delay 2.0 -v
-```
-
-**Parameters:**
-- `--output-dir`: Output directory (default: `fonts`)
-- `--max-pages`: Maximum pages to scrape per category
-- `--max-fonts`: Maximum fonts to download
-- `--delay`: Delay between requests in seconds (default: 2.0)
-- `-v, --verbose`: Show detailed information
-
----
-
-### 3. Verify and Clean Fonts
-
-**IMPORTANT!** This step removes fonts that cannot render Catalan characters or numbers.
-
-```bash
-# Preview what would be removed (dry run)
-python verify_and_clean_fonts.py --dry-run -v
-
-# Verify and remove invalid fonts
-python verify_and_clean_fonts.py -v
-
-# Only verify, don't remove
-python verify_and_clean_fonts.py --no-remove -v
-```
-
-**Parameters:**
-- `--fonts-dir`: Fonts directory (default: `fonts`)
-- `--dry-run`: Show what would be removed without actually removing
-- `--no-remove`: Only verify, don't remove
-- `--report`: Report file (default: `font_verification_report.txt`)
-- `-v, --verbose`: Show detailed information
-
-**Verified characters:**
-- Catalan characters: `·` (punt volat), `ç` (ce trencada)
-- Numbers: 0-9
-- Punctuation: `-, <, >, (, )`
-
-The script performs **double verification**:
-1. Checks if the font has characters in its table (cmap)
-2. **Tests actual rendering** of each character with PIL (detects fonts with cmap but no glyphs)
-
----
-
-### 4. Verify and Clean Texts (Optional)
-
-```bash
-# Verify scraped books
-python verify_and_clean_books.py -v
-
-# View statistics without cleaning
-python verify_and_clean_books.py --no-clean -v
-```
-
----
-
-### 5. Generate Synthetic Dataset
-
-**Main step!** Generates the dataset in HuggingFace format compatible with TrOCR.
-
-```bash
-# Basic generation (1 core, may be slow)
-python build_dataset.py --mode lines --style normal -v
-
-# PARALLEL generation (recommended - uses all cores)
-python build_dataset.py --mode lines --style normal --workers -1 -v
-
-# Generation with 8 specific cores
-python build_dataset.py --mode lines --style normal --workers 8 -v
-
-# Limit fonts per category (e.g., 10 fonts from each: Handwritten, Script, Brush, etc.)
-python build_dataset.py --mode lines --style normal --max-fonts-per-category 10 --workers -1 -v
-
-# Generate dataset with only Handwritten fonts
-python build_dataset.py --mode lines --style normal --category-filter Handwritten --workers -1 -v
-
-# Generate dataset with custom output name (saves to output_handwritten/)
-python build_dataset.py --mode lines --style normal --output-name handwritten --workers -1 -v
-
-# Combine: only Handwritten fonts, saved to output_handwritten/
-python build_dataset.py --mode lines --style normal --category-filter Handwritten --output-name handwritten --max-fonts-per-category 20 --workers -1 -v
-
-# Full generation with all options
-python build_dataset.py \
-    --data-dir data \
-    --fonts-dir fonts \
-    --output-dir output \
-    --mode lines \
-    --style normal \
-    --train-split 0.8 \
-    --val-split 0.1 \
-    --font-size 128 \
-    --max-fonts-per-category 50 \
-    --workers -1 \
-    -v
-```
-
-**Main Parameters:**
-- `--mode`: `lines` (5-word lines) or `words` (individual words) - default: `lines`
-- `--style`: `normal` or `bold` - default: `normal`
-- `--workers, -j`: Number of parallel cores. Use `-1` for all cores - default: `1`
-- `--font-size`: Image height in pixels - default: `128` (IAM/TrOCR compatible)
-- `--train-split`: Training proportion - default: `0.8` (80%)
-- `--val-split`: Validation proportion - default: `0.1` (10%)
-- `--max-texts`: Maximum number of texts to use
-- `--max-fonts-per-category`: Maximum fonts per category (e.g., Handwritten, Script, Brush)
-- `--category-filter`: Filter by specific category (e.g., Handwritten, Brush, Script, Calligraphy)
-- `--output-name`: Custom name for output directory (e.g., `handwritten` → `output_handwritten`)
-- `-v, --verbose`: Show detailed information
-
-**Output Formats:**
-- Images: RGB PNG, 128px height, variable width
-- Metadata: JSON Lines (`.jsonl`) per split
-- Dataset info: `dataset_info.json` with complete information
-
-**Generated Splits:**
-- Train: 80% (default)
-- Validation: 10% (default)
-- Test: 10% (automatic: 1 - train - val)
-
-```bash
-# Check how many cores you have
-echo %NUMBER_OF_PROCESSORS%  # Windows
-nproc                        # Linux/Mac
-```
-
----
-
-## 🧪 Testing and Utilities
-
-### Font Rendering Test
-
-```bash
-# Test all fonts
-python test_font_rendering.py --fonts-dir fonts -v
-
-# Test a specific font
-python test_font_rendering.py --font fonts/Brush/Amore_Mio/font.ttf
-
-# Test with output image
-python test_font_rendering.py \
-    --font fonts/Brush/Amore_Mio/font.ttf \
-    --output test_render.png
-```
-
----
-
-## 📊 Using the Dataset with TrOCR
-
-### Load the Dataset
-
-```python
-from datasets import load_dataset
-
-# Load generated dataset
-dataset = load_dataset('imagefolder', data_dir='./output')
-
-# View splits
-print(dataset.keys())  # dict_keys(['train', 'validation', 'test'])
-
-# View statistics
-print(f"Train: {len(dataset['train'])} samples")
-print(f"Validation: {len(dataset['validation'])} samples")
-print(f"Test: {len(dataset['test'])} samples")
-
-# View example
-sample = dataset['train'][0]
-print(f"Image: {sample['image']}")  # PIL Image
-print(f"Text: {sample['text']}")    # String
-```
-
-### Fine-tune TrOCR
-
-```python
-from transformers import TrOCRProcessor, VisionEncoderDecoderModel
-
-# Load pre-trained model
-processor = TrOCRProcessor.from_pretrained('microsoft/trocr-base-handwritten')
-model = VisionEncoderDecoderModel.from_pretrained('microsoft/trocr-base-handwritten')
-
-# Load dataset
-dataset = load_dataset('imagefolder', data_dir='./output')
-
-# Fine-tune (see HuggingFace Transformers documentation)
-# ...
-```
-
----
-
-## 📝 Dataset Format
-
-### File Structure
+The generated dataset follows HuggingFace format with train/validation/test splits:
 
 ```
 output/
 ├── train/
-│   ├── 00000000.png          # Image (128px height, variable width)
 │   ├── 00000001.png
+│   ├── 00000002.png
 │   ├── ...
-│   └── metadata.jsonl        # Metadata in JSON Lines format
+│   └── metadata.jsonl
 ├── validation/
-│   ├── 00000000.png
 │   ├── ...
 │   └── metadata.jsonl
 ├── test/
-│   ├── 00000000.png
 │   ├── ...
 │   └── metadata.jsonl
-└── dataset_info.json         # Dataset information
+└── dataset_info.json
 ```
 
-### metadata.jsonl Format
+## Supported Languages
 
-Each line is a JSON object:
+The framework supports **35 languages** with Latin script. Each language has a configuration file in `languages/` defining required special characters, Wikipedia URLs, and sample text for font verification.
 
-```json
-{"file_name": "00000000.png", "text": "això és una prova de", "font_name": "Amatic_SC", "font_category": "Handwriting", "font_style": "normal", "source_book": "Llibre_Example", "mode": "lines"}
-{"file_name": "00000001.png", "text": "text en català amb números", "font_name": "Architects_Daughter", "font_category": "Handwriting", "font_style": "normal", "source_book": "Llibre_Example", "mode": "lines"}
+### Category A — Global Languages (>50M speakers)
+
+| Language | Code | Speakers | Diacritics |
+|----------|------|----------|------------|
+| English | en | ~1,500M | none |
+| Spanish | es | ~550M | ñ, á, é, í, ó, ú |
+| Portuguese | pt | ~260M | à, á, â, ã, ç, é, ê, í, ó, ô, õ, ú |
+| French | fr | ~275M | à, â, ç, é, è, ê, ë, î, ï, ô, ù, û, ü, ÿ, œ, æ |
+| German | de | ~135M | ä, ö, ü, ß |
+| Indonesian | id | ~200M | none |
+| Vietnamese | vi | ~85M | many tones (ă, â, đ, ê, ô, ơ, ư + accents) |
+| Italian | it | ~65M | à, è, é, ì, ò, ù |
+| Turkish | tr | ~85M | ç, ğ, ı, ö, ş, ü |
+| Polish | pl | ~45M | ą, ć, ę, ł, ń, ó, ś, ź, ż |
+| Dutch | nl | ~25M | none (ij optional) |
+| Malay | ms | ~80M | none |
+| Swahili | sw | ~100M | none |
+
+### Category B — European National Languages (5-25M speakers)
+
+| Language | Code | Speakers | Diacritics |
+|----------|------|----------|------------|
+| Romanian | ro | ~24M | ă, â, î, ș, ț |
+| Czech | cs | ~10M | á, č, ď, é, ě, í, ň, ó, ř, š, ť, ú, ů, ý, ž |
+| Hungarian | hu | ~13M | á, é, í, ó, ö, ő, ú, ü, ű |
+| Swedish | sv | ~10M | å, ä, ö |
+| Catalan | ca | ~10M | à, ç, è, é, í, ï, ò, ó, ú, ü, l·l |
+| Croatian | hr | ~5M | č, ć, đ, š, ž |
+| Slovak | sk | ~5M | á, ä, č, ď, é, í, ĺ, ľ, ň, ó, ô, ŕ, š, ť, ú, ý, ž |
+| Danish | da | ~6M | æ, ø, å |
+| Norwegian | no | ~5M | æ, ø, å |
+| Finnish | fi | ~5M | ä, ö |
+| Slovenian | sl | ~2.5M | č, š, ž |
+| Lithuanian | lt | ~3M | ą, č, ę, ė, į, š, ų, ū, ž |
+| Latvian | lv | ~1.5M | ā, č, ē, ģ, ī, ķ, ļ, ņ, š, ū, ž |
+| Estonian | et | ~1.1M | ä, ö, ü, õ |
+
+### Category C — Minority and Regional Languages (<1M native speakers)
+
+| Language | Code | Speakers | Diacritics |
+|----------|------|----------|------------|
+| Galician | gl | ~2.5M | á, é, í, ñ, ó, ú |
+| Basque | eu | ~750K | ñ |
+| Welsh | cy | ~500K | â, ê, î, ô, û, ŵ, ŷ |
+| Icelandic | is | ~350K | á, ð, é, í, ó, ú, ý, þ, æ, ö |
+| Irish | ga | ~1.7M (few native) | á, é, í, ó, ú |
+| Breton | br | ~200K | añ, eñ, iñ, oñ, uñ |
+| Asturian | ast | ~100-450K | ḥ, ḷ, ñ |
+| Occitan | oc | ~100-500K | à, á, ç, è, é, í, ï, ò, ó, ú |
+| Aragonese | an | ~10-25K | á, é, í, ó, ú |
+
+### Unsupported Languages (Non-Latin Alphabets)
+
+| Alphabet | Languages |
+|----------|-----------|
+| Cyrillic | Russian, Ukrainian, Bulgarian, Serbian, Macedonian, Belarusian, Kazakh |
+| Greek | Modern Greek |
+| Arabic | Arabic, Persian, Urdu |
+| Hebrew | Hebrew, Yiddish |
+| CJK | Chinese (simplified/traditional), Japanese, Korean |
+| Indic | Hindi, Bengali, Tamil, Telugu, Marathi, Gujarati |
+| Others | Thai, Georgian, Armenian, Amharic, Khmer |
+
+---
+
+## Command-Line Arguments
+
+### General Parameters
+
+| Argument | Short | Description |
+|----------|-------|-------------|
+| `--language` | `-l` | **Required.** Target language(s) comma-separated (e.g., `catalan`, `spanish,french`) |
+| `--verbose` | `-v` | Show detailed output during execution |
+| `--output-name` | | Custom name for output folder (e.g., `--output-name test` creates `output_test/`) |
+
+### Step Control
+
+| Argument | Description |
+|----------|-------------|
+| `--skip-text` | Skip text download (use existing texts) |
+| `--skip-fonts` | Skip font download and verification (use existing fonts) |
+
+### Font Parameters
+
+| Argument | Default | Description |
+|----------|---------|-------------|
+| `--font-pages` | `5` | Number of DaFont pages to scan per category |
+| `--category-filter` | `Handwritten` | Font categories: `Handwritten`, `School` (comma-separated) |
+
+**Automatic font filtering:**
+- Fonts without required characters for target language(s)
+- Fonts missing common punctuation (`, . : ; ! ?`)
+- Blacklisted fonts (known watermarks or broken glyphs)
+- Fonts with rectangle placeholder glyphs (▢) detected at generation time
+
+### Generation Parameters
+
+| Argument | Default | Description |
+|----------|---------|-------------|
+| `--total-images` | No limit | Target total images |
+| `--max-texts` | All | Limit texts per language |
+| `--max-fonts-per-category` | All | Limit fonts per category |
+| `--mode` | `lines` | Mode: `lines`, `words`, or `lines,words` |
+| `--mode-distribution` | `50,50` | Image distribution for mixed modes (e.g., `70,30`) |
+
+**Note:** `--mode-distribution` applies to **images**, not texts. The system calculates optimal text-to-mode assignment automatically.
+
+### Background Parameters
+
+| Argument | Default | Description |
+|----------|---------|-------------|
+| `--background-color` | All | Colors: `white`, `grey`, `beige` |
+| `--background-type` | All | Types: `plain`, `grid`, `lined` |
+| `--no-backgrounds` | | Disable backgrounds (plain white only) |
+
+### Perturbation Parameters
+
+| Argument | Default | Description |
+|----------|---------|-------------|
+| `--perturbations` | Off | Enable realistic perturbations |
+| `--quality-distribution` | `40,40,20` | Percentages for `clean,degraded,severe` |
+
+**Quality Levels:**
+- **Clean:** No perturbations
+- **Degraded:** Light perturbations (subtle blur, minor rotation ±0.5°, light noise)
+- **Severe:** Heavy perturbations (mandatory blur, contrast reduction, rotation ±1.0°)
+
+---
+
+## Examples
+
+```bash
+# Basic single language
+python run_pipeline.py --language catalan -v
+
+# Multilingual with perturbations
+python run_pipeline.py --language catalan,polish,romanian \
+    --total-images 3000 --perturbations -v
+
+# Full pipeline with all options
+python run_pipeline.py --language english \
+    --category-filter Handwritten,School --font-pages 50 \
+    --total-images 5000 --perturbations --quality-distribution 40,40,20 \
+    --mode lines,words --mode-distribution 70,30 \
+    --output-name english_full -v
+
+# Quick regeneration (reuse existing texts and fonts)
+python run_pipeline.py --language catalan \
+    --skip-text --skip-fonts \
+    --total-images 1000 --perturbations -v
 ```
 
-### dataset_info.json
+---
+
+## Output Metadata
+
+Each image includes metadata in `metadata.jsonl`:
 
 ```json
 {
-  "description": "Synthetic dataset",
-  "version": "1.0.0",
-  "splits": {
-    "train": {"name": "train", "num_samples": 80000},
-    "validation": {"name": "validation", "num_samples": 10000},
-    "test": {"name": "test", "num_samples": 10000}
-  },
-  "features": {
-    "file_name": {"dtype": "string"},
-    "text": {"dtype": "string"},
-    "font_name": {"dtype": "string"},
-    "font_category": {"dtype": "string"},
-    "font_style": {"dtype": "string"},
-    "source_book": {"dtype": "string"},
-    "mode": {"dtype": "string"}
-  },
+  "file_name": "00000001.png",
+  "text": "The quick brown fox jumps over the lazy dog.",
+  "char_count": 44,
+  "word_count": 9,
+  "language": "english",
+  "font_name": "Belle_Allure",
+  "font_category": "School",
+  "font_style": "normal",
+  "source_book": "wikipedia_en",
+  "background_type": "grid",
+  "background_color": "grey",
   "mode": "lines",
-  "style": "normal",
-  "total_samples": 100000,
-  "num_fonts": 2000
+  "quality": "severe",
+  "perturbations": {
+    "blur_radius": 2.48,
+    "rotation_angle": -1.78,
+    "contrast_factor": 0.48
+  }
 }
 ```
 
----
-
-## 🎯 Technical Specifications
-
-### Images
-
-- **Format**: RGB PNG
-- **Fixed height**: 128 pixels (compatible with IAM Database)
-- **Variable width**: According to text length
-- **No padding**: Padding is added during training
-- **TrOCR preprocessing**: Automatic resize to 384×384 internally
-
-### Texts
-
-- **Language**: Catalan
-- **Source**: Wikisource (validated books)
-- **Lines mode**: 5-word chunks
-- **Words mode**: Individual words
-
-### Fonts
-
-- **Type**: Handwriting/manuscript style
-- **Verification**: Double check (cmap + rendering)
-- **Required characters**: Catalan (·, ç), numbers (0-9), punctuation
+| Field | Description |
+|-------|-------------|
+| `char_count` | Number of characters |
+| `word_count` | Number of words |
+| `mode` | `lines` (sentence) or `words` (single word) |
+| `quality` | `clean`, `degraded`, or `severe` |
+| `perturbations` | Applied perturbations (if quality ≠ clean) |
 
 ---
 
-## ⚙️ Compatibility
+## Dataset Verification
 
-### Operating Systems
-
-- ✅ **Windows** (multiprocessing with 'spawn' method)
-- ✅ **Linux** (multiprocessing with 'fork' method, more efficient)
-- ✅ **macOS** (multiprocessing with 'fork' method)
-
-### ML Frameworks
-
-- ✅ **HuggingFace Transformers** (TrOCR, ViT, etc.)
-- ✅ **HuggingFace Datasets**
-- ✅ **PyTorch**
-- ✅ **TensorFlow** (with conversion)
-
----
-
-## 🔧 Multiprocessing Technical Details
-
-### Thread-Safety and Race Conditions
-
-The code is designed to **completely avoid race conditions**:
-
-1. **Unique pre-assigned filenames**:
-   - Filenames (`00000000.png`, `00000001.png`, etc.) are calculated **BEFORE** launching workers
-   - Each task has a guaranteed unique name
-   - ✅ **No write conflicts**
-
-2. **No concurrent writes**:
-   - Each worker writes **different** files (pre-assigned names)
-   - No locks or semaphores needed
-   - ✅ **Thread-safe by design**
-
-3. **Metadata in main process**:
-   - Workers return metadata (don't write it)
-   - Collection happens in main process
-   - ✅ **No race conditions in metadata**
-
-4. **Statistics updated at the end**:
-   - Counters are updated **after** collecting all results
-   - ✅ **No double counting**
-
-### Equitable Load Distribution
-
-The system guarantees **equitable distribution** among workers:
-
-1. **Task preparation**:
-   - All tasks are prepared beforehand (complete list)
-   - Known total: `N_fonts × N_texts × words_per_text`
-
-2. **Dynamic load balancing**:
-   - Uses `pool.imap_unordered()` (not `map()`)
-   - Workers dynamically take tasks from the pool
-   - If a worker finishes quickly, it takes more tasks
-   - ✅ **Automatic balancing**
-
-3. **Optimized chunksize**:
-   - Formula: `chunksize = max(1, total_tasks / (workers × 4))`
-   - Example: 100,000 tasks with 8 workers = chunksize ~3,125
-   - Reduces communication overhead
-   - ✅ **Maximum efficiency**
-
-4. **Method by OS**:
-   - **Windows**: `'spawn'` method (required, slower)
-   - **Linux/Mac**: `'fork'` method (faster, COW - Copy-On-Write)
-
-### Expected Performance
-
-**Note**: Efficiency decreases with more workers due to:
-- Inter-process communication overhead
-- I/O contention (disk)
-- Memory bandwidth limits
-
-**Recommendation**: Use `workers = number_of_cores - 2` to leave room for the OS.
-
-### Example Output with Verbose
-
-**Example 1: Limiting fonts per category**
-```bash
-$ python build_dataset.py --mode lines --style normal --max-fonts-per-category 10 --workers 8 -v
-
-============================================================
-GENERADOR DE DATASET SINTÉTICO - FORMATO HUGGINGFACE
-============================================================
-
-[1] Escaneando fuentes...
-  [OK] Fuentes escaneadas:
-    Con bold: 523
-    Sin bold: 1477
-    Fuentes usadas (normal): 80
-    Fuentes saltadas: 523
-
-  [INFO] Límite por categoría: 10
-
-  Fuentes por categoría:
-    Brush: 10/250 (limitado)
-    Calligraphy: 10/180 (limitado)
-    Celtic: 5/5
-    Handwritten: 10/500 (limitado)
-    Script: 10/300 (limitado)
-    School: 10/150 (limitado)
-    Typewriter: 10/42 (limitado)
-    Various: 10/50 (limitado)
-
-[2] Cargando textos...
-  [OK] 5432 líneas de texto cargadas (5 palabras por línea)
-
-[3] Generando dataset (lines)...
-  [INFO] Generando: 5432 textos × 80 fuentes
-  [INFO] Splits: train=80%, val=10%, test=10%
-  [INFO] Usando 8 workers en paralelo
-  Total imágenes esperadas: 434,560
-
-  [INFO] Total tareas: 434,560
-  [INFO] Chunksize: 13,580
-
-Generando imágenes: 100%|████████████| 434560/434560 [12:45<00:00, 568.32img/s]
-
-  [OK] 434,560 imágenes generadas
-    Train: 347,648
-    Validation: 43,456
-    Test: 43,456
-
-[SUCCESS] Dataset generado correctamente!
-```
-
-**Example 2: Category filter with custom output name**
-```bash
-$ python build_dataset.py --mode lines --style normal --category-filter Handwritten --output-name handwritten --max-fonts-per-category 20 --workers 8 -v
-
-============================================================
-GENERADOR DE DATASET SINTÉTICO - FORMATO HUGGINGFACE
-============================================================
-Nombre de dataset: handwritten
-Output: output_handwritten
-Categoría: Handwritten
-
-[1] Escaneando fuentes...
-  [FILTRO] Solo usando categoría: Handwritten
-  [SKIP] Categoría Brush (filtrada)
-  [SKIP] Categoría Calligraphy (filtrada)
-  [SKIP] Categoría Script (filtrada)
-  [SKIP] Categoría School (filtrada)
-  [SKIP] Categoría Various (filtrada)
-
-  [OK] Fuentes escaneadas:
-    Con bold: 50
-    Sin bold: 267
-    Fuentes usadas (normal): 20
-    Fuentes saltadas: 297
-
-  [INFO] Límite por categoría: 20
-
-  Fuentes por categoría:
-    Handwritten: 20/267 (limitado)
-
-[2] Cargando textos...
-  [OK] 179614 líneas de texto cargadas (5 palabras por línea)
-
-[3] Generando dataset (lines)...
-  [INFO] Generando: 179614 textos × 20 fuentes
-  [INFO] Splits: train=80%, val=10%, test=10%
-  [INFO] Usando 8 workers en paralelo
-  Total imágenes esperadas: 3,592,280
-
-  Procesando 3,592,280 tareas...
-  Iniciando workers...
-  Workers iniciados, esperando resultados...
-  Progreso: 17,961/3,592,280 (0.5%)
-  Progreso: 35,922/3,592,280 (1.0%)
-  ...
-
-  [OK] 3,592,280 imágenes generadas
-    Train: 2,873,824
-    Validation: 359,228
-    Test: 359,228
-
-[SUCCESS] Dataset generado correctamente en output_handwritten/!
-```
-
----
-
-## 💡 Tips and Best Practices
-
-### Limiting Fonts Per Category
-
-If you have many fonts and want to:
-- **Test the pipeline quickly**: Use `--max-fonts-per-category 5` or `10`
-- **Create a balanced dataset**: Use `--max-fonts-per-category 50` to ensure equal representation
-- **Reduce dataset size**: Limit fonts per category instead of limiting texts
-
-The system will:
-- ✅ Select fonts **randomly** from each category (Handwritten, Script, Brush, etc.)
-- ✅ Use **all available fonts** if a category has fewer than the limit
-- ✅ Show clear statistics: `Handwritten: 10/500 (limitado)` or `Celtic: 5/5`
-
-**Example:**
-```bash
-# Quick test with 5 fonts per category
-python build_dataset.py --mode lines --max-fonts-per-category 5 --workers -1 -v
-
-# Production dataset with 100 fonts per category
-python build_dataset.py --mode lines --max-fonts-per-category 100 --workers -1 -v
-```
-
----
-
-### Filtering by Font Category
-
-Generate specialized datasets for specific font styles:
-
-**Available categories:** `Handwritten`, `Script`, `Brush`, `Calligraphy`, `School`, `Typewriter`, `Various`, `Sans Serif`, `Serif`, etc.
+Use `verify_dataset.py` to validate generated datasets:
 
 ```bash
-# Dataset with ONLY Handwritten fonts
-python build_dataset.py --mode lines --category-filter Handwritten --workers -1 -v
-
-# Dataset with ONLY Brush fonts
-python build_dataset.py --mode lines --category-filter Brush --workers -1 -v
-
-# Dataset with ONLY Script fonts + limit to 10 fonts
-python build_dataset.py --mode lines --category-filter Script --max-fonts-per-category 10 --workers -1 -v
+python verify_dataset.py output_my_dataset
 ```
 
-**Benefits:**
-- ✅ Focus on specific handwriting styles
-- ✅ Create specialized models (e.g., cursive-only, print-only)
-- ✅ Faster generation (fewer fonts = less time)
-- ✅ Better style consistency in training data
+**Checks performed:**
+- ✅ Rectangle glyphs (placeholder characters)
+- ✅ Metadata integrity (`char_count`, `word_count`)
+- ✅ Mode distribution (lines vs words)
+- ✅ Quality distribution (clean/degraded/severe)
+- ✅ Multilingual support
+- ✅ Special characters per language
 
----
-
-### Custom Output Names
-
-Organize multiple datasets with custom names:
-
-```bash
-# Generates dataset in output_handwritten/
-python build_dataset.py --output-name handwritten --workers -1 -v
-
-# Generates dataset in output_brush_bold/
-python build_dataset.py --output-name brush_bold --style bold --workers -1 -v
-
-# Default: generates in output/
-python build_dataset.py --workers -1 -v
+**Example output:**
 ```
-
-**Directory structure:**
-```
-project/
-├── output/                    # Default dataset (all fonts)
-├── output_handwritten/        # Handwritten-only dataset
-├── output_brush/              # Brush-only dataset
-├── output_script_bold/        # Script fonts in bold
-└── output_school/             # School/print fonts
-```
-
-**Use case - Generate multiple specialized datasets:**
-```bash
-# 1. Handwritten dataset
-python build_dataset.py \
-    --category-filter Handwritten \
-    --output-name handwritten \
-    --max-fonts-per-category 50 \
-    --workers -1 -v
-
-# 2. Brush dataset
-python build_dataset.py \
-    --category-filter Brush \
-    --output-name brush \
-    --max-fonts-per-category 30 \
-    --workers -1 -v
-
-# 3. Script dataset
-python build_dataset.py \
-    --category-filter Script \
-    --output-name script \
-    --max-fonts-per-category 40 \
-    --workers -1 -v
-
-# Now you have 3 specialized datasets to train different models!
+📂 Verifying: output_test/
+======================================================================
+📊 MULTILINGUAL DATASET VERIFICATION
+======================================================================
+📈 GENERAL STATISTICS
+   Total images: 4,428
+   Unique fonts: 52
+🌍 LANGUAGES
+   catalan: 1,344 images (30.4%), 33 fonts
+   polish: 1,683 images (38.0%), 33 fonts
+   romanian: 1,401 images (31.6%), 10 fonts
+📝 MODES
+   lines: 2,697 (60.9%)
+   words: 1,731 (39.1%)
+🎨 QUALITY
+   clean: 1,549 (35.0%)
+   degraded: 1,775 (40.1%)
+   severe: 1,104 (24.9%)
+======================================================================
+🧪 TESTS
+======================================================================
+✅ TEST RECTANGLES: PASSED
+✅ TEST METADATA: PASSED
+✅ TEST MODES: PASSED
+✅ TEST MULTILINGUAL: PASSED
+======================================================================
+🎉 ALL CRITICAL TESTS PASSED!
+======================================================================
 ```
 
 ---
 
-## 🐛 Troubleshooting
+## License
 
-### Fonts generate "unknown" characters (�)
+MIT License
 
-**Solution**: Run the font verifier with rendering:
+## Acknowledgments
 
-```bash
-python verify_and_clean_fonts.py -v
-```
-
-The script now performs double verification (cmap + actual rendering).
-
-### Dataset generation is very slow
-
-**Solution**: Use multiprocessing with all cores:
-
-```bash
-python build_dataset.py --workers -1 -v
-```
-
-### Error "RuntimeError: context has already been set"
-
-**Solution**: This can occur on Windows. Make sure:
-- You're running the script as `python build_dataset.py` (not importing it)
-- You have the latest code version with `mp.freeze_support()`
-
-### Want to continue scraping from where I left off
-
-**Solution**: Use `--start-from-book`:
-
-```bash
-python scrape_wikisource.py --start-from-book "Last_scraped_book" -v
-```
-
----
-
-## 📚 References
-
-- **TrOCR Paper**: [TrOCR: Transformer-based Optical Character Recognition with Pre-trained Models](https://arxiv.org/abs/2109.10282)
-- **TrOCR HuggingFace**: [microsoft/trocr-base-handwritten](https://huggingface.co/microsoft/trocr-base-handwritten)
-- **IAM Database**: [IAM Handwriting Database](https://fki.tic.heia-fr.ch/databases/iam-handwriting-database)
-- **Wikisource Català**: [Categoria:Llibres validats](https://ca.wikisource.org/wiki/Categoria:Llibres_validats)
-
----
-
-## 📄 License
-
-This project is for educational and research purposes. Downloaded fonts have their own licenses (check on DaFont). Wikisource texts are in the public domain or under free licenses.
-
----
-
-## 🤝 Contributions
-
-Suggestions and improvements are welcome. This is a research project for synthetic dataset generation.
-
----
-
-## ✨ Quick Commands (Cheatsheet)
-
-```bash
-# 1. Scrape texts
-python scrape_wikisource.py -v
-
-# 2. Download fonts
-python download_fonts.py -v
-
-# 3. Clean fonts
-python verify_and_clean_fonts.py -v
-
-# 4. Generate dataset (PARALLEL - RECOMMENDED)
-python build_dataset.py --mode lines --style normal --workers -1 -v
-
-# 4b. Generate dataset with limited fonts per category (faster, good for testing)
-python build_dataset.py --mode lines --style normal --max-fonts-per-category 10 --workers -1 -v
-
-# 4c. Generate specialized dataset (Handwritten only)
-python build_dataset.py --mode lines --category-filter Handwritten --output-name handwritten --workers -1 -v
-
-# 4d. Generate multiple specialized datasets
-python build_dataset.py --category-filter Handwritten --output-name handwritten --max-fonts-per-category 50 --workers -1 -v
-python build_dataset.py --category-filter Brush --output-name brush --max-fonts-per-category 30 --workers -1 -v
-python build_dataset.py --category-filter Script --output-name script --max-fonts-per-category 40 --workers -1 -v
-
-# 5. Load dataset
-python -c "from datasets import load_dataset; ds = load_dataset('imagefolder', data_dir='./output'); print(ds)"
-
-# 5b. Load specialized dataset
-python -c "from datasets import load_dataset; ds = load_dataset('imagefolder', data_dir='./output_handwritten'); print(ds)"
-```
-
-**Ready to generate your synthetic dataset!** 🚀
+This project is a fork of [Daniel Grao's TFG](https://github.com/original-repo) with significant enhancements for multilingual support, mode mixing, and quality assurance.

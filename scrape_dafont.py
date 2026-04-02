@@ -34,7 +34,7 @@ class DaFontScraper:
         self.language_configs = self._load_language_configs(languages)
         
         if self.verbose:
-            print(f"[INFO] Idiomes carregats: {', '.join(self.language_configs.keys())}")
+            print(f"[INFO] Languages loaded: {', '.join(self.language_configs.keys())}")
         
         # Fonts amb problemes coneguts: logos, watermarks, glifs trencats
         self.font_blacklist = [
@@ -53,8 +53,8 @@ class DaFontScraper:
             'Nowyal',                    # Glifs faltants / watermark
             'Vítkova_písanka',           # Watermark "personal use only - fonty.cendik.ca"
             'Vítkova písanka',
-            'Cursif',                    # Glifs buits per ó/ò
-            'Ecolier',                   # Glifs buits per ó/ò
+            'Cursif',                    # Empty glyphs for ó/ò
+            'Ecolier',                   # Empty glyphs for ó/ò
         ]
 
     def _load_language_configs(self, languages=None):
@@ -66,7 +66,7 @@ class DaFontScraper:
         languages_dir = Path(__file__).parent / 'languages'
         
         if not languages_dir.exists():
-            print(f"[WARNING] Directori languages/ no existeix: {languages_dir}")
+            print(f"[WARNING] languages/ directory not found: {languages_dir}")
             return configs
         
         available_langs = [p.stem for p in languages_dir.glob('*.json')]
@@ -88,31 +88,31 @@ class DaFontScraper:
                             'name': config.get('name', lang)
                         }
                 except Exception as e:
-                    print(f"[WARNING] Error carregant {config_path}: {e}")
+                    print(f"[WARNING] Error loading {config_path}: {e}")
             else:
-                print(f"[WARNING] Idioma no trobat: {lang}")
-                print(f"  Disponibles: {', '.join(available_langs)}")
+                print(f"[WARNING] Language not found: {lang}")
+                print(f"  Available: {', '.join(available_langs)}")
         
         return configs
 
     def _get_base_required_chars(self):
         """Retorna els caràcters base requerits per totes les fonts."""
         base_chars = set()
-        # Números
+        # Numbers
         for cp in range(0x0030, 0x003A):  # 0-9
             base_chars.add(cp)
-        # Puntuació bàsica i signes comuns
+        # Basic punctuation and common signs
         base_chars.update([
             0x002C,  # , (coma)
             0x002E,  # . (punt)
-            0x002D,  # - (guió)
-            0x0027,  # ' (apòstrof)
-            0x0021,  # ! (exclamació)
-            0x003F,  # ? (interrogació)
+            0x002D,  # - (hyphen)
+            0x0027,  # ' (apostrophe)
+            0x0021,  # ! (exclamation)
+            0x003F,  # ? (question mark)
             0x003A,  # : (dos punts)
             0x003B,  # ; (punt i coma)
-            0x0028,  # ( (parèntesi esquerre)
-            0x0029,  # ) (parèntesi dret)
+            0x0028,  # ( (left parenthesis)
+            0x0029,  # ) (right parenthesis)
             0x0022,  # " (cometes dobles)
         ])
         return base_chars
@@ -143,7 +143,7 @@ class DaFontScraper:
             if dark_ratio > 0.08:
                 return True, f"Test 1 (espais): massa píxels foscos ({dark_ratio:.1%})"
             
-            # Test 2: Números (molts watermarks apareixen amb números)
+            # Test 2: Numbers (molts watermarks apareixen amb números)
             test_text2 = "1 2 3 4 5 6 7 8 9 0"
             img2 = Image.new('RGB', (800, 80), 'white')
             draw2 = ImageDraw.Draw(img2)
@@ -168,7 +168,7 @@ class DaFontScraper:
             dark_pixels3 = sum(1 for p in pixels3 if p < 180)
             dark_ratio3 = dark_pixels3 / len(pixels3)
             
-            # Amb només 3 lletres i molts espais, hauria de tenir molt pocs píxels foscos
+            # With only 3 letters and spaces, should have very few dark pixels
             if dark_ratio3 > 0.04:
                 return True, f"Test 3 (espais llargs): contingut als espais ({dark_ratio3:.1%})"
             
@@ -200,15 +200,15 @@ class DaFontScraper:
         try:
             pil_font = ImageFont.truetype(io.BytesIO(font_data), font_size)
             
-            # Crear imatge petita per renderitzar el caràcter
+            # Create small image to render character
             img = Image.new('L', (60, 60), 255)  # Fons blanc
             draw = ImageDraw.Draw(img)
             draw.text((10, 10), char, font=pil_font, fill=0)  # Text negre
             
-            # Comptar píxels foscos
+            # Count dark pixels
             dark_pixels = sum(1 for p in img.getdata() if p < 200)
             
-            # Si té menys de 5 píxels foscos, el glif és buit o quasi invisible
+            # If less than 5 dark pixels, glyph is empty or nearly invisible
             return dark_pixels >= 5
             
         except Exception:
@@ -389,7 +389,7 @@ class DaFontScraper:
                 print(f"      [X] Failed to load font: {e}")
             return []
 
-        # Primer, verificar caràcters base (números, puntuació)
+        # First verify base chars (numbers, punctuation)
         base_chars = self._get_base_required_chars()
         for cp in base_chars:
             if cp not in cmap:
@@ -404,7 +404,7 @@ class DaFontScraper:
             required_chars = config['required_chars']
             
             if not required_chars:
-                # Idioma sense caràcters especials (ex: anglès)
+                # Language without special characters (ex: anglès)
                 supported_languages.append(lang)
                 continue
             
@@ -418,7 +418,7 @@ class DaFontScraper:
                     all_present = False
                     missing.append(char)
                 else:
-                    # Verificar que el glif es renderitza (no és buit)
+                    # Verify glyph renders (not empty)
                     if not self._glyph_renders_correctly(font_data, char):
                         all_present = False
                         empty_glyphs.append(char)
@@ -426,13 +426,13 @@ class DaFontScraper:
             if all_present:
                 supported_languages.append(lang)
                 if self.verbose:
-                    print(f"      [OK] Suporta {lang}")
+                    print(f"      [OK] Supports {lang}")
             else:
                 if self.verbose:
                     if missing:
-                        print(f"      [X] {lang}: falten {', '.join(missing[:5])}{'...' if len(missing) > 5 else ''}")
+                        print(f"      [X] {lang}: missing {', '.join(missing[:5])}{'...' if len(missing) > 5 else ''}")
                     if empty_glyphs:
-                        print(f"      [X] {lang}: glifs buits {', '.join(empty_glyphs[:5])}{'...' if len(empty_glyphs) > 5 else ''}")
+                        print(f"      [X] {lang}: empty glyphs {', '.join(empty_glyphs[:5])}{'...' if len(empty_glyphs) > 5 else ''}")
 
         # Si la font suporta algun idioma, comprovar watermarks
         if supported_languages:

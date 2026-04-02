@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-Genera fons de paper sintètics per al dataset.
-Crea 9 combinacions: 3 colors (white, grey, beige) × 3 tipus (plain, grid, lined).
-Ús: python generate_backgrounds.py -v
+Generate synthetic paper backgrounds for the dataset.
+Creates 9 combinations: 3 colors (white, grey, beige) × 3 types (plain, grid, lined).
+Usage: python generate_backgrounds.py -v
 """
 
 import argparse
@@ -13,7 +13,7 @@ import numpy as np
 
 
 def add_noise(img, intensity=10):
-    """Afegeix soroll de textura al paper"""
+    """Add texture noise to paper"""
     arr = np.array(img, dtype=np.float32)
     noise = np.random.normal(0, intensity, arr.shape)
     arr = np.clip(arr + noise, 0, 255).astype(np.uint8)
@@ -21,7 +21,7 @@ def add_noise(img, intensity=10):
 
 
 def get_base_color(color_name):
-    """Retorna color RGB i intensitat de soroll segons el nom del color"""
+    """Return RGB color and noise intensity based on color name"""
     if color_name == 'white':
         base = random.randint(245, 255)
         return (base, base, base), 3
@@ -38,59 +38,59 @@ def get_base_color(color_name):
 
 def get_grid_line_color(color_name):
     """
-    Retorna un color de línia amb bon contrast segons el color de fons.
-    Les línies han de ser prou diferents del fons per ser visibles.
+    Return a line color with good contrast based on background color.
+    Lines must be sufficiently different from background to be visible.
     """
     if color_name == 'white':
-        # Fons blanc (~245-255): línies blaves/grises clares funcionen bé
+        # White background (~245-255): light blue/gray lines work well
         return random.choice([
-            (180, 210, 230),  # Blau clar
-            (200, 215, 230),  # Blau molt clar
-            (190, 200, 210),  # Gris blavós
-            (175, 205, 175),  # Verd clar
+            (180, 210, 230),  # Light blue
+            (200, 215, 230),  # Very light blue
+            (190, 200, 210),  # Bluish gray
+            (175, 205, 175),  # Light green
         ])
     elif color_name == 'grey':
-        # Fons gris (~195-215): necessitem línies MÉS FOSQUES per contrast
+        # Gray background (~195-215): we need DARKER lines for contrast
         return random.choice([
-            (140, 170, 200),  # Blau mitjà (bon contrast)
-            (150, 150, 170),  # Gris blavós fosc
-            (130, 160, 190),  # Blau steel
-            (145, 175, 145),  # Verd mitjà
+            (140, 170, 200),  # Medium blue (good contrast)
+            (150, 150, 170),  # Bluish gray fosc
+            (130, 160, 190),  # Steel blue
+            (145, 175, 145),  # Medium green
         ])
     elif color_name == 'beige':
-        # Fons beix (~230-245, ~218-232, ~185-205): línies blaves/grises clares
+        # Beige background (~230-245, ~218-232, ~185-205): línies blaves/grises clares
         return random.choice([
-            (170, 195, 220),  # Blau clar
-            (180, 190, 200),  # Gris blavós
-            (165, 185, 165),  # Verd suau
-            (175, 200, 215),  # Blau cel
+            (170, 195, 220),  # Light blue
+            (180, 190, 200),  # Bluish gray
+            (165, 185, 165),  # Soft green
+            (175, 200, 215),  # Sky blue
         ])
 
 
 def get_lined_line_color(color_name):
     """
-    Retorna un color de línia horitzontal amb bon contrast segons el fons.
+    Return a horizontal line color with good contrast based on background.
     """
     if color_name == 'white':
         return random.choice([
-            (170, 200, 230),  # Blau clar
-            (185, 195, 210),  # Gris blavós
+            (170, 200, 230),  # Light blue
+            (185, 195, 210),  # Bluish gray
         ])
     elif color_name == 'grey':
-        # Necessitem línies més fosques per veure-les sobre gris
+        # We need darker lines to see them on gray
         return random.choice([
             (130, 160, 195),  # Blau mitjà
-            (140, 150, 165),  # Gris fosc blavós
+            (140, 150, 165),  # Dark bluish gray
         ])
     elif color_name == 'beige':
         return random.choice([
-            (165, 190, 220),  # Blau clar
-            (175, 185, 200),  # Gris blavós
+            (165, 190, 220),  # Light blue
+            (175, 185, 200),  # Bluish gray
         ])
 
 
 def add_paper_texture(img, draw, color, color_name, width, height):
-    """Afegeix textura de paper segons el color"""
+    """Add paper texture based on color"""
     if color_name == 'grey':
         for _ in range(random.randint(15, 40)):
             x = random.randint(0, width)
@@ -114,7 +114,7 @@ def add_paper_texture(img, draw, color, color_name, width, height):
 
 
 def generate_plain(width, height, count, output_dir, color_name):
-    """Fons llis sense patró"""
+    """Plain background without pattern"""
     folder = output_dir / f'plain_{color_name}'
     folder.mkdir(parents=True, exist_ok=True)
     for i in range(count):
@@ -127,7 +127,7 @@ def generate_plain(width, height, count, output_dir, color_name):
 
 
 def generate_grid(width, height, count, output_dir, color_name):
-    """Fons quadriculat amb colors de línia adaptats al fons"""
+    """Grid background with line colors adapted to background"""
     folder = output_dir / f'grid_{color_name}'
     folder.mkdir(parents=True, exist_ok=True)
     for i in range(count):
@@ -138,11 +138,11 @@ def generate_grid(width, height, count, output_dir, color_name):
         img = add_paper_texture(img, draw, color, color_name, width, height)
 
         draw = ImageDraw.Draw(img)
-        # Mida de quadrícula realista: una lletra ha de cabre en ~1-2 files
-        # Text típic ~100-150px, quadrícules de 60-80px són proporcionals
+        # Realistic grid size: a letter should fit in ~1-2 rows
+        # Typical text ~100-150px, 60-80px grids are proportional
         grid_size = random.choice([60, 70, 80])
         
-        # Color de línia adaptat al fons per garantir contrast
+        # Line color adapted to background to ensure contrast
         line_color = get_grid_line_color(color_name)
         
         for x in range(0, width, grid_size):
@@ -154,7 +154,7 @@ def generate_grid(width, height, count, output_dir, color_name):
 
 
 def generate_lined(width, height, count, output_dir, color_name):
-    """Fons pautat amb marge aleatori i colors de línia adaptats"""
+    """Lined background with random margin and adapted line colors"""
     folder = output_dir / f'lined_{color_name}'
     folder.mkdir(parents=True, exist_ok=True)
     for i in range(count):
@@ -165,10 +165,10 @@ def generate_lined(width, height, count, output_dir, color_name):
         img = add_paper_texture(img, draw, color, color_name, width, height)
 
         draw = ImageDraw.Draw(img)
-        # Espai entre línies realista: similar a quadrícules, text ~100-150px
+        # Realistic line spacing: similar to grids, text ~100-150px
         line_spacing = random.choice([60, 70, 80])
         
-        # Color de línia adaptat al fons
+        # Line color adapted to background
         line_color = get_lined_line_color(color_name)
         
         for y in range(line_spacing, height, line_spacing):
@@ -183,18 +183,18 @@ def generate_lined(width, height, count, output_dir, color_name):
 
 def main():
     parser = argparse.ArgumentParser(
-        description='Genera fons de paper sintètics (3 colors × 3 tipus = 9 combinacions)'
+        description='Generate synthetic paper backgrounds (3 colors × 3 types = 9 combinations)'
     )
     parser.add_argument('--output-dir', default='backgrounds',
-                        help='Directori de sortida (default: backgrounds)')
+                        help='Output directory (default: backgrounds)')
     parser.add_argument('--width', type=int, default=2000,
-                        help='Amplada de les imatges (default: 2000)')
+                        help='Image width (default: 2000)')
     parser.add_argument('--height', type=int, default=400,
-                        help='Alçada de les imatges (default: 400)')
+                        help='Image height (default: 400)')
     parser.add_argument('--count', type=int, default=5,
-                        help='Nombre d\'imatges per combinació (default: 5)')
+                        help='Nombre d\'images per combinació (default: 5)')
     parser.add_argument('--verbose', '-v', action='store_true',
-                        help='Mostrar informació detallada')
+                        help='Show detailed information')
 
     args = parser.parse_args()
     output_dir = Path(args.output_dir)
@@ -207,22 +207,22 @@ def main():
     }
 
     print("=" * 60)
-    print("  GENERADOR DE FONS DE PAPER")
+    print("  PAPER BACKGROUND GENERATOR")
     print("=" * 60)
-    print(f"  Directori: {output_dir}")
-    print(f"  Mida: {args.width}x{args.height}")
-    print(f"  Imatges per combinació: {args.count}")
-    print(f"  Combinacions: {len(colors)} colors × {len(types_map)} tipus = {len(colors) * len(types_map)}")
+    print(f"  Directory: {output_dir}")
+    print(f"  Size: {args.width}x{args.height}")
+    print(f"  Images per combination: {args.count}")
+    print(f"  Combinations: {len(colors)} colors × {len(types_map)} types = {len(colors) * len(types_map)}")
     print("=" * 60)
 
     for type_name, gen_func in types_map.items():
         for color_name in colors:
             gen_func(args.width, args.height, args.count, output_dir, color_name)
             if args.verbose:
-                print(f"  [OK] {type_name}_{color_name}: {args.count} imatges")
+                print(f"  [OK] {type_name}_{color_name}: {args.count} images")
 
     total = args.count * len(colors) * len(types_map)
-    print(f"\n[SUCCESS] {total} fons generats a {output_dir.absolute()}")
+    print(f"\n[SUCCESS] {total} backgrounds generated in {output_dir.absolute()}")
 
 
 if __name__ == "__main__":

@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Generador de dataset sintético de texto manuscrito multilingüe
-Usa textos de /data/ y fuentes de /fonts/ para crear imágenes de líneas y palabras
-Soporta fondos de papel realistas desde /backgrounds/
-Fondos organizados por tipo (plain, grid, lined) y color (white, grey, beige)
+Generador from dataset sintético from texto manuscrito multilingüe
+Usa texts from /data/ y fuentes from /fonts/ para crear imágenes from líneas y palabras
+Soporta fondos from papel realistas desde /backgrounds/
+Backgrounds organizados por tipo (plain, grid, lined) y color (white, grey, beige)
 Soporta perturbaciones realistas para simular documentos escaneados/fotografiados
 """
 
@@ -19,7 +19,7 @@ from tqdm import tqdm
 import multiprocessing as mp
 from functools import partial
 import platform
-# Suprimir warnings de fontTools sobre timestamps
+# Suprimir warnings from fontTools sobre timestamps
 import warnings
 import logging
 warnings.filterwarnings('ignore', module='fontTools')
@@ -38,7 +38,7 @@ from apply_perturbations import PerturbationPipeline, QualityLevel
 def _is_rectangle_glyph(glyph):
     """
     Detecta si un glif és un rectangle placeholder.
-    Els rectangles placeholders tenen 2 contorns amb 4 punts cadascun formant rectangles.
+    Els rectangles placeholders tenen 2 contorns with 4 punts cadascun formant rectangles.
     """
     if not hasattr(glyph, 'numberOfContours') or not hasattr(glyph, 'coordinates'):
         return False
@@ -76,7 +76,7 @@ def _is_rectangle_glyph(glyph):
         height = glyph.yMax - glyph.yMin
         if width > 0 and height > 0:
             # Un rectangle placeholder típicament és molt alt i estret o té proporcions específiques
-            # I té poques coordenades per la seva mida (un glif real de lletra té moltes més)
+            # I té poques coordenades per la seva mida (un glif real from lletra té moltes més)
             coords_per_area = len(coords) / (width * height) * 1000000
             # Un rectangle simple té ~8 coordenades, una lletra real en té moltes més
             if len(coords) <= 12 and glyph.numberOfContours == 2:
@@ -145,11 +145,11 @@ def _glyph_exists_in_font(font_path, char):
         return False
 
 
-# Cache per verificació de glifs
+# Cache per verificació from glifs
 _glyph_exists_cache = {}
 
 def _check_glyph_exists_cached(font_path, char):
-    """Versió amb cache de la verificació de glifs."""
+    """Versió with cache from la verificació from glifs."""
     cache_key = (str(font_path), char)
     if cache_key not in _glyph_exists_cache:
         _glyph_exists_cache[cache_key] = _glyph_exists_in_font(font_path, char)
@@ -158,7 +158,7 @@ def _check_glyph_exists_cached(font_path, char):
 
 def _font_supports_text(font_path, text):
     """
-    Verifica si una fuente soporta todos los caracteres de un texto.
+    Verifica si una fuente soporta todos los caracteres from un texto.
     Comprova que els glifs existeixen realment (no són .notdef/rectangles).
     Retorna True si soporta todos, False si falta alguno.
     """
@@ -181,9 +181,9 @@ _font_support_cache = {}
 
 def _check_font_supports_text_cached(font_path, text):
     """
-    Versión con caché de la verificación de soporte de caracteres.
+    Versión con caché from la verificación from soporte from caracteres.
     """
-    # Crear una clave única para el conjunto de caracteres únics del text
+    # Crear una clave única para el conjunto from caracteres únics del text
     unique_chars = ''.join(sorted(set(c for c in text if not c.isspace())))
     cache_key = (font_path, unique_chars)
     
@@ -273,7 +273,7 @@ def _generate_single_image(task, target_height=128):
         # Centrar texto verticalment
         y = (target_height - text_height) // 2 - bbox[1]
 
-        # Color de tinta con ligera variación
+        # Color from tinta con ligera variación
         ink_r = random.randint(0, 30)
         ink_g = random.randint(0, 30)
         ink_b = random.randint(0, 40)
@@ -310,7 +310,7 @@ def _generate_single_image(task, target_height=128):
             'quality': perturb_metadata.get('quality', 'clean'),
         }
         
-        # Afegir paràmetres de pertorbació si n'hi ha
+        # Afegir paràmetres from pertorbació si n'hi ha
         perturbation_params = {k: v for k, v in perturb_metadata.items() if k != 'quality' and v is not None}
         if perturbation_params:
             metadata_entry['perturbations'] = perturbation_params
@@ -328,7 +328,7 @@ def _generate_single_image(task, target_height=128):
 def _load_required_chars_for_languages(languages_str):
     """
     Carrega els caràcters requerits per a tots els idiomes especificats.
-    Retorna un conjunt amb tots els caràcters únics necessaris.
+    Retorna un conjunt with tots els caràcters únics necessaris.
     """
     required_chars = set()
     
@@ -343,7 +343,7 @@ def _load_required_chars_for_languages(languages_str):
     else:
         languages = [languages_str]
     
-    # Carregar caràcters específics de cada idioma
+    # Carregar caràcters específics from cada idioma
     for lang in languages:
         lang_file = Path('languages') / f'{lang}.json'
         if lang_file.exists():
@@ -387,7 +387,7 @@ class SyntheticDatasetBuilder:
                  background_color=None, background_type=None,
                  perturbations=False, quality_distribution=(40, 40, 20),
                  language='unknown'):
-        # Guardar data_dir com a string (pot contenir múltiples directoris separats per comes)
+        # Guardar data_dir com a string (pot contenir múltiples directories separats per comes)
         self.data_dir = data_dir
         self.fonts_dir = Path(fonts_dir)
         self.output_dir = Path(output_dir)
@@ -402,11 +402,11 @@ class SyntheticDatasetBuilder:
             # Per defecte 50/50 si hi ha dos modes
             self.mode_distribution = [50] * len(self.modes)
         
-        # Normalitzar distribució per assegurar que suma 100
+        # Normalitzar distribution per assegurar que suma 100
         total = sum(self.mode_distribution)
         self.mode_distribution = [d / total for d in self.mode_distribution]
         
-        # Per compatibilitat amb codi existent
+        # Per compatibilitat with codi existent
         self.mode = self.modes[0]
         
         self.style = style
@@ -443,7 +443,7 @@ class SyntheticDatasetBuilder:
         if self.backgrounds_dir and self.backgrounds_dir.exists():
             self._load_backgrounds()
 
-        # Proporciones de splits
+        # Proporciones from splits
         self.train_split = train_split
         self.val_split = val_split
         self.test_split = 1.0 - train_split - val_split
@@ -464,7 +464,7 @@ class SyntheticDatasetBuilder:
             'fonts_skipped': 0,
             'fonts_incompatible': 0,  # Fonts que no suporten caràcters requerits
             'images_generated': 0,
-            'images_skipped_unsupported': 0,  # Imatges saltades per falta de suport de caràcters
+            'images_skipped_unsupported': 0,  # Imatges saltades per falta from suport from caràcters
             'lines_generated': 0,
             'words_generated': 0,
             'train_samples': 0,
@@ -479,8 +479,8 @@ class SyntheticDatasetBuilder:
         self.texts = []
 
     def _select_mode_for_item(self):
-        """Selecciona el mode per una imatge segons la distribució configurada.
-        NOTA: Amb modes mixtos i distribució per IMATGES, aquest mètode no s'usa.
+        """Selecciona el mode per una imatge segons la distribution configurada.
+        NOTA: Amb modes mixtos i distribution per IMATGES, aquest mètode no s'usa.
         En el seu lloc, s'usa _assign_modes_to_texts().
         """
         if len(self.modes) == 1:
@@ -495,29 +495,29 @@ class SyntheticDatasetBuilder:
         return self.modes[-1]
     
     def _assign_modes_to_texts(self, texts, num_fonts):
-        """Assigna modes als textos per aconseguir la distribució d'IMATGES desitjada.
+        """Assigna modes als texts per aconseguir la distribution d'IMATGES desitjada.
         
         Args:
-            texts: Llista de textos a processar
-            num_fonts: Nombre de fonts que s'usaran
+            texts: Llista from texts a processar
+            num_fonts: Nombre from fonts que s'usaran
             
         Returns:
-            Llista de tuples (text_data, mode)
+            Llista from tuples (text_data, mode)
         """
         if len(self.modes) == 1:
             return [(t, self.modes[0]) for t in texts]
         
-        # Calcular mitjana de paraules per text
+        # Calcular mitjana from paraules per text
         total_words = sum(len(t['text'].split()) for t in texts)
         avg_words = total_words / len(texts) if texts else 7
         
-        # Obtenir distribució desitjada
+        # Obtenir distribution desitjada
         lines_ratio = self.mode_distribution[self.modes.index('lines')] if 'lines' in self.modes else 0
         words_ratio = self.mode_distribution[self.modes.index('words')] if 'words' in self.modes else 0
         
-        # Calcular quants textos necessitem per cada mode per aconseguir la distribució d'imatges
+        # Calcular quants texts necessitem per cada mode per aconseguir la distribution d'images
         # lines: 1 imatge per text × font
-        # words: avg_words imatges per text × font
+        # words: avg_words images per text × font
         # 
         # Si volem lines_ratio% lines i words_ratio% words en IMATGES:
         # lines_images = lines_texts * 1 * fonts
@@ -537,10 +537,10 @@ class SyntheticDatasetBuilder:
         if lines_ratio == 0:
             return [(t, 'words') for t in texts]
         
-        # Ratio de textos lines vs words per aconseguir la distribució d'imatges
+        # Ratio from texts lines vs words per aconseguir la distribution d'images
         text_ratio = (lines_ratio * avg_words) / words_ratio
         
-        # Calcular nombre de textos per cada mode
+        # Calcular nombre from texts per cada mode
         # lines_texts + words_texts = total_texts
         # lines_texts / words_texts = text_ratio
         # lines_texts = text_ratio * words_texts
@@ -550,7 +550,7 @@ class SyntheticDatasetBuilder:
         words_texts = int(total_texts / (text_ratio + 1))
         lines_texts = total_texts - words_texts
         
-        # Assegurar mínim 1 text per mode si hi ha prou textos
+        # Assegurar mínim 1 text per mode si hi ha prou texts
         if lines_texts == 0 and total_texts >= 2:
             lines_texts = 1
             words_texts = total_texts - 1
@@ -564,10 +564,10 @@ class SyntheticDatasetBuilder:
             total_imgs = expected_lines_imgs + expected_words_imgs
             actual_lines_pct = expected_lines_imgs / total_imgs * 100 if total_imgs > 0 else 0
             actual_words_pct = expected_words_imgs / total_imgs * 100 if total_imgs > 0 else 0
-            print(f"  [MODES] {lines_texts} textos lines + {words_texts} textos words")
+            print(f"  [MODES] {lines_texts} texts lines + {words_texts} texts words")
             print(f"  [MODES] Imatges esperades: ~{actual_lines_pct:.0f}% lines / ~{actual_words_pct:.0f}% words")
         
-        # Barrejar textos i assignar modes
+        # Barrejar texts i assignar modes
         shuffled_texts = texts.copy()
         random.shuffle(shuffled_texts)
         
@@ -582,24 +582,24 @@ class SyntheticDatasetBuilder:
         return result
 
     def _load_backgrounds(self):
-        """Carrega les imatges de fons disponibles filtrant per color i tipus"""
-        print("[0] Cargando fondos de papel...")
+        """Carrega les images from fons available filtrant per color i type"""
+        print("[0] Loading paper backgrounds...")
 
         # Parsejar filtres
         color_filter = None
         type_filter = None
         if self.background_color:
             color_filter = [c.strip() for c in self.background_color.split(',')]
-            print(f"  [FILTRO] Colors: {', '.join(color_filter)}")
+            print(f"  [FILTER] Colors: {', '.join(color_filter)}")
         if self.background_type:
             type_filter = [t.strip() for t in self.background_type.split(',')]
-            print(f"  [FILTRO] Tipus: {', '.join(type_filter)}")
+            print(f"  [FILTER] Type: {', '.join(type_filter)}")
 
         for bg_dir in self.backgrounds_dir.iterdir():
             if not bg_dir.is_dir():
                 continue
 
-            # El nom de la carpeta és "type_color" (ex: grid_white, lined_grey)
+            # El nom from la carpeta és "type_color" (ex: grid_white, lined_grey)
             parts = bg_dir.name.split('_', 1)
             if len(parts) != 2:
                 continue
@@ -609,11 +609,11 @@ class SyntheticDatasetBuilder:
             # Aplicar filtres
             if color_filter and bg_color not in color_filter:
                 if self.verbose:
-                    print(f"  [SKIP] {bg_dir.name} (color filtrat)")
+                    print(f"  [SKIP] {bg_dir.name} (color filtered)")
                 continue
             if type_filter and bg_type not in type_filter:
                 if self.verbose:
-                    print(f"  [SKIP] {bg_dir.name} (tipus filtrat)")
+                    print(f"  [SKIP] {bg_dir.name} (type filtered)")
                 continue
 
             for bg_file in bg_dir.glob('*.png'):
@@ -628,21 +628,21 @@ class SyntheticDatasetBuilder:
         for bg in self.backgrounds:
             bg_summary[f"{bg['type']}_{bg['color']}"] += 1
 
-        print(f"  [OK] {len(self.backgrounds)} fondos cargados")
+        print(f"  [OK] {len(self.backgrounds)} backgrounds loaded")
         for name in sorted(bg_summary.keys()):
             print(f"    {name}: {bg_summary[name]}")
 
     def scan_fonts(self):
-        """Escanea el directorio de fuentes y filtra por compatibilidad con cada idioma"""
-        print("[1] Escaneando fuentes...")
+        """Escanea el directorio from fuentes y filtra por compatibilidad con cada idioma"""
+        print("[1] Scanning fonts...")
 
         if self.category_filter:
             self.category_filter_list = [c.strip() for c in self.category_filter.split(',')]
-            print(f"  [FILTRO] Solo usando categorías: {', '.join(self.category_filter_list)}")
+            print(f"  [FILTER] Only using categories: {', '.join(self.category_filter_list)}")
         else:
             self.category_filter_list = None
 
-        # Primer, recollir totes les fonts disponibles
+        # Primer, recollir totes les fonts available
         all_fonts = []
 
         for category_dir in self.fonts_dir.iterdir():
@@ -651,7 +651,7 @@ class SyntheticDatasetBuilder:
 
             if self.category_filter_list and category_dir.name not in self.category_filter_list:
                 if self.verbose:
-                    print(f"  [SKIP] Categoría {category_dir.name} (filtrada)")
+                    print(f"  [SKIP] Category {category_dir.name} (filtered)")
                 continue
 
             for font_dir in category_dir.iterdir():
@@ -691,7 +691,7 @@ class SyntheticDatasetBuilder:
                     else:
                         self.stats['fonts_skipped'] += 1
                         if self.verbose:
-                            print(f"  [SKIP] {category_dir.name}/{font_dir.name} - Sin bold")
+                            print(f"  [SKIP] {category_dir.name}/{font_dir.name} - No bold")
                 elif self.style == 'normal':
                     if normal_fonts:
                         font_info = {
@@ -703,7 +703,7 @@ class SyntheticDatasetBuilder:
                     else:
                         self.stats['fonts_skipped'] += 1
                         if self.verbose:
-                            print(f"  [SKIP] {category_dir.name}/{font_dir.name} - Sin normal")
+                            print(f"  [SKIP] {category_dir.name}/{font_dir.name} - No normal")
 
                 if font_info:
                     all_fonts.append(font_info)
@@ -736,7 +736,7 @@ class SyntheticDatasetBuilder:
             self.stats['fonts_by_lang'][lang] = len(compatible_fonts)
         
         # self.fonts manté totes les fonts per compatibilitat
-        # (usar la unió de totes les fonts compatibles amb algun idioma)
+        # (usar la unió from totes les compatible fonts with algun idioma)
         all_compatible = {}
         for lang_fonts in self.fonts_by_lang.values():
             for f in lang_fonts:
@@ -746,28 +746,28 @@ class SyntheticDatasetBuilder:
         self.stats['fonts_used'] = len(self.fonts)
         self.stats['fonts_incompatible'] = len(all_fonts) - len(self.fonts)
 
-        print(f"  [OK] Fuentes escaneadas:")
-        print(f"    Con bold: {self.stats['fonts_with_bold']}")
-        print(f"    Sin bold: {self.stats['fonts_without_bold']}")
-        print(f"    Fuentes totales encontradas: {len(all_fonts)}")
+        print(f"  [OK] Fonts scanned:")
+        print(f"    With bold: {self.stats['fonts_with_bold']}")
+        print(f"    No bold: {self.stats['fonts_without_bold']}")
+        print(f"    Total fonts found: {len(all_fonts)}")
         
-        print(f"\n  [FILTRO PER IDIOMA]")
+        print(f"\n  [FILTER BY LANGUAGE]")
         for lang in self.languages:
-            print(f"    {lang}: {self.stats['fonts_by_lang'][lang]} fonts compatibles")
+            print(f"    {lang}: {self.stats['fonts_by_lang'][lang]} compatible fonts")
         
         if len(self.languages) > 1:
             min_fonts = min(self.stats['fonts_by_lang'].values())
             max_fonts = max(self.stats['fonts_by_lang'].values())
-            print(f"    (rang: {min_fonts} - {max_fonts} fonts)")
+            print(f"    (range: {min_fonts} - {max_fonts} fonts)")
 
         if self.max_fonts_per_category is not None:
-            print(f"\n  [INFO] Límite por categoría: {self.max_fonts_per_category}")
+            print(f"\n  [INFO] Limit per category: {self.max_fonts_per_category}")
 
     def load_texts(self):
-        """Carga todos los textos del directorio data (o múltiples directorios)"""
-        print("\n[2] Cargando textos...")
+        """Carga todos los texts del directorio data (o múltiples directorios)"""
+        print("\n[2] Loading texts...")
         
-        # Suportar múltiples directoris separats per comes
+        # Suportar múltiples directories separats per comes
         if isinstance(self.data_dir, str) and ',' in self.data_dir:
             data_dirs = [Path(d.strip()) for d in self.data_dir.split(',')]
         else:
@@ -779,16 +779,16 @@ class SyntheticDatasetBuilder:
         else:
             languages = [self.language] * len(data_dirs)
         
-        # Assegurar que tenim el mateix nombre d'idiomes que directoris
+        # Assegurar que tenim el mateix nombre d'idiomes que directories
         if len(languages) == 1 and len(data_dirs) > 1:
             languages = languages * len(data_dirs)
         elif len(languages) != len(data_dirs):
-            print(f"  [WARNING] Nombre d'idiomes ({len(languages)}) != directoris ({len(data_dirs)})")
+            print(f"  [WARNING] Number of languages ({len(languages)}) != directories ({len(data_dirs)})")
             languages = languages[:len(data_dirs)] if len(languages) > len(data_dirs) else languages + [languages[-1]] * (len(data_dirs) - len(languages))
         
         for data_dir, lang in zip(data_dirs, languages):
             if not data_dir.exists():
-                print(f"  [WARNING] Directori no existeix: {data_dir}")
+                print(f"  [WARNING] Directory not found: {data_dir}")
                 continue
                 
             txt_sources = []
@@ -834,11 +834,11 @@ class SyntheticDatasetBuilder:
                                     texts_loaded += 1
                 except Exception as e:
                     if self.verbose:
-                        print(f"  [ERROR] Error leyendo {txt_file}: {e}")
+                        print(f"  [ERROR] Error reading {txt_file}: {e}")
             
-            print(f"  [OK] {lang}: {texts_loaded} frases carregades de {data_dir}")
+            print(f"  [OK] {lang}: {texts_loaded} sentences loaded from {data_dir}")
         
-        print(f"  [OK] Total: {len(self.texts)} frases carregades")
+        print(f"  [OK] Total: {len(self.texts)} sentences loaded")
 
     def generate_image(self, text, font_info, target_height=128):
         """Genera una imagen con el texto y la fuente especificada"""
@@ -910,7 +910,7 @@ class SyntheticDatasetBuilder:
             # Centrar texto verticalment
             y = (target_height - text_height) // 2 - bbox[1]
 
-            # Color de tinta con ligera variación
+            # Color from tinta con ligera variación
             ink_r = random.randint(0, 30)
             ink_g = random.randint(0, 30)
             ink_b = random.randint(0, 40)
@@ -920,19 +920,19 @@ class SyntheticDatasetBuilder:
 
         except Exception as e:
             if self.verbose:
-                print(f"  [ERROR] Error generando imagen: {e}")
+                print(f"  [ERROR] Error generating image: {e}")
             return None, 'plain', 'white'
 
     def generate_dataset(self, max_texts=None, total_images=None, balanced=False, target_height=128):
         """Genera el dataset sintético en formato HuggingFace"""
-        print(f"\n[3] Generando dataset ({self.mode})...")
+        print(f"\n[3] Generating dataset ({self.mode})...")
 
         if not self.fonts:
-            print("  [ERROR] No hay fuentes disponibles")
+            print("  [ERROR] No fonts available")
             return
 
         if not self.texts:
-            print("  [ERROR] No hay textos disponibles")
+            print("  [ERROR] No texts available")
             return
 
         num_fonts = len(self.fonts)
@@ -946,33 +946,33 @@ class SyntheticDatasetBuilder:
             texts_by_lang[lang].append(t)
         num_languages = len(texts_by_lang)
         
-        # Obtenir el mínim de fonts entre tots els idiomes (per garantir equilibri)
+        # Obtenir el mínim from fonts entre tots els idiomes (per garantir equilibri)
         if hasattr(self, 'fonts_by_lang') and self.fonts_by_lang:
             min_fonts_per_lang = min(len(f) for f in self.fonts_by_lang.values()) if self.fonts_by_lang else num_fonts
         else:
             min_fonts_per_lang = num_fonts
         
-        # Si s'ha especificat total_images, calcular textos i fonts PER IDIOMA
-        # Cada idioma pot tenir un nombre diferent de fonts disponibles
-        self.texts_per_lang_limit = {}  # Límit de textos per idioma
-        self.fonts_per_lang_limit = {}  # Límit de fonts per idioma
+        # Si s'ha especificat total_images, calcular texts i fonts PER IDIOMA
+        # Cada idioma pot tenir un nombre diferent from fonts available
+        self.texts_per_lang_limit = {}  # Límit from texts per idioma
+        self.fonts_per_lang_limit = {}  # Límit from fonts per idioma
         
-        # NOTA: No apliquem mode_multiplier al càlcul de textos.
-        # La distribució de modes s'aplica després amb _assign_modes_to_texts().
-        # Això pot generar més imatges del target, però garanteix la distribució correcta.
+        # NOTA: No apliquem mode_multiplier al càlcul from texts.
+        # La distribution from modes s'aplica després with _assign_modes_to_texts().
+        # Això pot generar més images del target, però garanteix la distribution correcta.
         
         if total_images:
             if balanced and num_languages > 1 and hasattr(self, 'fonts_by_lang') and self.fonts_by_lang:
                 # Càlcul DINÀMIC per idioma
                 images_per_lang = total_images // num_languages
-                MIN_TEXTS_PER_LANG = 5  # Mínim textos per varietat lingüística
+                MIN_TEXTS_PER_LANG = 5  # Mínim texts per varietat lingüística
                 
-                # Amb modes mixtos, necessitem més textos per distribució fiable
+                # Amb modes mixtos, necessitem més texts per distribution fiable
                 if len(self.modes) > 1:
                     MIN_TEXTS_PER_LANG = 30
                 
-                print(f"  [INFO] Target: {total_images} imatges ({images_per_lang}/idioma)")
-                print(f"  [CÀLCUL DINÀMIC PER IDIOMA]")
+                print(f"  [INFO] Target: {total_images} images ({images_per_lang}/idioma)")
+                print(f"  [DYNAMIC CALCULATION PER LANGUAGE]")
                 
                 total_expected = 0
                 for lang in self.fonts_by_lang:
@@ -983,14 +983,14 @@ class SyntheticDatasetBuilder:
                         self.fonts_per_lang_limit[lang] = 0
                         continue
                     
-                    # Calcular fonts a usar: limitar si tenim masses per garantir mínim textos
+                    # Calcular fonts a usar: limitar si tenim masses per garantir mínim texts
                     max_fonts_for_min_texts = images_per_lang // MIN_TEXTS_PER_LANG
                     if max_fonts_for_min_texts < 1:
                         max_fonts_for_min_texts = 1
                     
                     fonts_to_use = min(fonts_available, max_fonts_for_min_texts)
                     
-                    # Calcular textos necessaris per arribar al target
+                    # Calcular texts necessaris per arribar al target
                     texts_needed = images_per_lang // fonts_to_use
                     if texts_needed < MIN_TEXTS_PER_LANG:
                         texts_needed = MIN_TEXTS_PER_LANG
@@ -1005,10 +1005,10 @@ class SyntheticDatasetBuilder:
                     
                     expected = texts_needed * fonts_to_use
                     total_expected += expected
-                    print(f"    {lang}: {texts_needed} textos × {fonts_to_use} fonts = ~{expected} imatges (mode lines)")
+                    print(f"    {lang}: {texts_needed} texts × {fonts_to_use} fonts = ~{expected} images (mode lines)")
                 
-                print(f"  [INFO] Total esperat: ~{total_expected} imatges (target: {total_images})")
-                print(f"  [NOTA] Amb modes mixtos, el total real pot variar segons distribució lines/words")
+                print(f"  [INFO] Expected total: ~{total_expected} images (target: {total_images})")
+                print(f"  [NOTE: With mixed modes, actual total may vary based on lines/words distribution")
                 
                 # max_texts es calcularà al sampling equilibrat
                 max_texts = None
@@ -1016,21 +1016,21 @@ class SyntheticDatasetBuilder:
                 # Un sol idioma o no equilibrat
                 max_texts = total_images // min_fonts_per_lang
                 
-                # Amb modes mixtos, garantir mínim textos per distribució estadísticament fiable
-                # Necessitem almenys 30 textos per tenir ~3-4 textos en mode words i control de distribució
+                # Amb modes mixtos, garantir mínim texts per distribution estadísticament fiable
+                # Necessitem almenys 30 texts per tenir ~3-4 texts en mode words i control from distribution
                 MIN_TEXTS_FOR_MODE_DISTRIBUTION = 30
                 if len(self.modes) > 1 and max_texts < MIN_TEXTS_FOR_MODE_DISTRIBUTION:
                     max_texts = MIN_TEXTS_FOR_MODE_DISTRIBUTION
                     if self.verbose:
-                        print(f"  [INFO] Ajustat a {max_texts} textos mínim per distribució de modes fiable")
+                        print(f"  [INFO] Adjusted to {max_texts} texts mínim per distribution from modes fiable")
                 
                 if max_texts < 1:
                     max_texts = 1
-                print(f"  [INFO] total_images={total_images} → max_texts={max_texts} (amb {min_fonts_per_lang} fonts)")
+                print(f"  [INFO] total_images={total_images} → max_texts={max_texts} (with {min_fonts_per_lang} fonts)")
         
         # Sampling equilibrat per idiomes
         if balanced and num_languages > 1:
-            # Seleccionar textos per idioma segons els límits calculats
+            # Seleccionar texts per idioma segons els límits calculats
             texts_to_use = []
             for lang, texts in texts_by_lang.items():
                 random.shuffle(texts)
@@ -1050,39 +1050,39 @@ class SyntheticDatasetBuilder:
                 
                 fonts_for_lang = len(self.fonts_by_lang.get(lang, self.fonts))
                 expected_imgs = selected * fonts_for_lang
-                print(f"  [BALANCED] {lang}: {selected} textos × {fonts_for_lang} fonts = {expected_imgs} imatges")
+                print(f"  [BALANCED] {lang}: {selected} texts × {fonts_for_lang} fonts = {expected_imgs} images")
             
             random.shuffle(texts_to_use)
-            print(f"  [BALANCED] Total textos: {len(texts_to_use)}")
+            print(f"  [BALANCED] Total texts: {len(texts_to_use)}")
         else:
-            # IMPORTANT: Barrejar ABANS de seleccionar per garantir mescla d'idiomes
+            # IMPORTANT: Barrejar ABANS from seleccionar per garantir mescla d'idiomes
             random.shuffle(self.texts)
             texts_to_use = self.texts[:max_texts] if max_texts else self.texts
 
-        # Mostrar distribució d'idiomes
+        # Mostrar distribution d'idiomes
         lang_counts = {}
         for t in texts_to_use:
             lang = t.get('language', 'unknown')
             lang_counts[lang] = lang_counts.get(lang, 0) + 1
         if len(lang_counts) > 1:
-            print(f"  [INFO] Distribució textos: {lang_counts}")
+            print(f"  [INFO] Text distribution: {lang_counts}")
 
-        # Calcular total imatges esperades (considerant fonts per idioma)
+        # Calcular total images esperades (considerant fonts per idioma)
         total_expected_images = 0
         for lang, count in lang_counts.items():
             fonts_for_lang = len(self.fonts_by_lang.get(lang, self.fonts))
             total_expected_images += count * fonts_for_lang
         
-        print(f"  [INFO] Total imatges esperades: {total_expected_images}")
+        print(f"  [INFO] Total images esperades: {total_expected_images}")
         if self.backgrounds:
-            print(f"  [INFO] Fondos: {len(self.backgrounds)} disponibles")
+            print(f"  [INFO] Backgrounds: {len(self.backgrounds)} available")
         else:
-            print(f"  [INFO] Fondos: blanco (sin backgrounds/)")
+            print(f"  [INFO] Backgrounds: blanco (sin backgrounds/)")
         print(f"  [INFO] Splits: train={self.train_split:.0%}, val={self.val_split:.0%}, test={self.test_split:.0%}")
         if self.perturbations_enabled:
-            print(f"  [INFO] Perturbaciones: ON (distribución: {self.quality_distribution[0]}% clean, {self.quality_distribution[1]}% degraded, {self.quality_distribution[2]}% severe)")
+            print(f"  [INFO] Perturbations: ON (distributionn: {self.quality_distribution[0]}% clean, {self.quality_distribution[1]}% degraded, {self.quality_distribution[2]}% severe)")
         else:
-            print(f"  [INFO] Perturbaciones: OFF")
+            print(f"  [INFO] Perturbations: OFF")
         if self.num_workers > 1:
             print(f"  [INFO] Usando {self.num_workers} workers en paralelo")
 
@@ -1090,7 +1090,7 @@ class SyntheticDatasetBuilder:
         
         # Si tenim múltiples idiomes, fer split PER IDIOMA per garantir equilibri
         if len(lang_counts) > 1:
-            # Agrupar textos per idioma
+            # Agrupar texts per idioma
             texts_by_lang_to_split = {}
             for t in texts_to_use:
                 lang = t.get('language', 'unknown')
@@ -1108,11 +1108,11 @@ class SyntheticDatasetBuilder:
                     # Només 1 text: va tot al train
                     train_texts.extend(lang_texts)
                 elif n == 2:
-                    # 2 textos: 1 train, 1 test
+                    # 2 texts: 1 train, 1 test
                     train_texts.append(lang_texts[0])
                     test_texts.append(lang_texts[1])
                 else:
-                    # 3+ textos: split normal
+                    # 3+ texts: split normal
                     train_end_lang = max(1, int(n * self.train_split))
                     val_end_lang = train_end_lang + max(1, int(n * self.val_split))
                     if val_end_lang >= n:
@@ -1122,12 +1122,12 @@ class SyntheticDatasetBuilder:
                     val_texts.extend(lang_texts[train_end_lang:val_end_lang])
                     test_texts.extend(lang_texts[val_end_lang:])
             
-            # Barrejar dins de cada split
+            # Barrejar dins from cada split
             random.shuffle(train_texts)
             random.shuffle(val_texts)
             random.shuffle(test_texts)
             
-            # Mostrar distribució per split
+            # Mostrar distribution per split
             for split_name, split_texts in [('train', train_texts), ('val', val_texts), ('test', test_texts)]:
                 if split_texts:
                     split_langs = {}
@@ -1140,7 +1140,7 @@ class SyntheticDatasetBuilder:
             train_end = int(n_texts * self.train_split)
             val_end = train_end + int(n_texts * self.val_split)
             
-            # Garantir mínim textos per split si n'hi ha prou
+            # Garantir mínim texts per split si n'hi ha prou
             if n_texts >= 3 and train_end == 0:
                 train_end = 1
             if n_texts >= 3 and val_end == train_end:
@@ -1157,7 +1157,7 @@ class SyntheticDatasetBuilder:
         # Calcular total_items tenint en compte fonts per idioma i modes mixtos
         total_items = 0
         
-        # Determinar probabilitat de mode 'words'
+        # Determinar probabilitat from mode 'words'
         words_prob = 0
         for mode, prob in zip(self.modes, self.mode_distribution):
             if mode == 'words':
@@ -1175,7 +1175,7 @@ class SyntheticDatasetBuilder:
                 else:
                     total_items += num_fonts
             else:
-                # Modes mixtos: estimar basant-se en distribució
+                # Modes mixtos: estimar basant-se en distribution
                 num_words = len(td['text'].split())
                 lines_contrib = (1 - words_prob) * num_fonts
                 words_contrib = words_prob * num_words * num_fonts
@@ -1201,13 +1201,13 @@ class SyntheticDatasetBuilder:
         self._save_metadata_jsonl(self.test_dir / 'metadata.jsonl', test_metadata)
         self._create_dataset_info()
 
-        print(f"  [OK] {self.stats['images_generated']:,} imágenes generadas")
+        print(f"  [OK] {self.stats['images_generated']:,} images generated")
         print(f"    Train: {self.stats['train_samples']:,}")
         print(f"    Validation: {self.stats['val_samples']:,}")
         print(f"    Test: {self.stats['test_samples']:,}")
         
         if self.perturbations_enabled:
-            print(f"\n  Distribución de calidad:")
+            print(f"\n  Quality distribution:")
             print(f"    Clean: {self.stats['quality_clean']:,}")
             print(f"    Degraded: {self.stats['quality_degraded']:,}")
             print(f"    Severe: {self.stats['quality_severe']:,}")
@@ -1219,13 +1219,13 @@ class SyntheticDatasetBuilder:
         tasks = []
         counters = {'train': 0, 'validation': 0, 'test': 0}
         
-        # Configuració de pertorbacions per passar als workers
+        # Configuració from pertorbacions per passar als workers
         perturbation_config = {
             'enabled': self.perturbations_enabled,
             'quality_distribution': self.quality_distribution
         } if self.perturbations_enabled else None
 
-        # Pre-assignar modes a TOTS els textos junts (per distribució global d'IMATGES)
+        # Pre-assignar modes a TOTS els texts junts (per distribution global d'IMATGES)
         num_fonts = len(self.fonts)
         all_texts = []
         for split_name, split_texts in [('train', train_texts), ('validation', val_texts), ('test', test_texts)]:
@@ -1233,10 +1233,10 @@ class SyntheticDatasetBuilder:
                 all_texts.append((split_name, t))
         
         if len(self.modes) > 1:
-            # Extreure només els textos per calcular modes
+            # Extreure només els texts per calcular modes
             just_texts = [t for _, t in all_texts]
             texts_with_modes = self._assign_modes_to_texts(just_texts, num_fonts)
-            # Re-associar amb els splits
+            # Re-associar with els splits
             all_texts_with_modes = [(all_texts[i][0], texts_with_modes[i][0], texts_with_modes[i][1]) 
                                      for i in range(len(all_texts))]
         else:
@@ -1250,7 +1250,7 @@ class SyntheticDatasetBuilder:
             text = text_data['text']
             text_lang = text_data.get('language', self.languages[0] if self.languages else 'unknown')
             
-            # Obtenir fonts compatibles amb aquest idioma
+            # Obtenir compatible fonts with aquest idioma
             if text_lang in self.fonts_by_lang:
                 compatible_fonts = self.fonts_by_lang[text_lang]
             else:
@@ -1301,7 +1301,7 @@ class SyntheticDatasetBuilder:
         optimal_chunksize = max(1, len(tasks) // (self.num_workers * 4))
 
         if self.verbose:
-            print(f"  [INFO] Total tareas: {len(tasks):,}")
+            print(f"  [INFO] Total tasks: {len(tasks):,}")
             print(f"  [INFO] Chunksize: {optimal_chunksize}")
 
         if platform.system() == 'Windows':
@@ -1313,8 +1313,8 @@ class SyntheticDatasetBuilder:
 
         with ctx.Pool(processes=self.num_workers) as pool:
             results = []
-            print(f"\n  Procesando {len(tasks):,} tareas...")
-            print(f"  Iniciando workers...", flush=True)
+            print(f"\n  Processing {len(tasks):,} tasks...")
+            print(f"  Starting workers...", flush=True)
             processed = 0
             report_interval = max(500, len(tasks) // 200)
 
@@ -1350,7 +1350,7 @@ class SyntheticDatasetBuilder:
         self.stats['val_samples'] = len(val_metadata)
         self.stats['test_samples'] = len(test_metadata)
 
-        # Comptar lines/words segons el mode real de cada imatge
+        # Comptar lines/words segons el mode real from cada imatge
         for metadata in train_metadata + val_metadata + test_metadata:
             if metadata.get('mode') == 'words':
                 self.stats['words_generated'] += 1
@@ -1365,7 +1365,7 @@ class SyntheticDatasetBuilder:
         global_val_count = 0
         global_test_count = 0
 
-        # Pre-assignar modes a TOTS els textos junts (per distribució global d'IMATGES)
+        # Pre-assignar modes a TOTS els texts junts (per distribution global d'IMATGES)
         num_fonts = len(self.fonts)
         all_texts = []
         split_metadata_map = {'train': train_metadata, 'validation': val_metadata, 'test': test_metadata}
@@ -1383,14 +1383,14 @@ class SyntheticDatasetBuilder:
         else:
             all_texts_with_modes = [(split, t, self.modes[0]) for split, t in all_texts]
 
-        with tqdm(total=total_items, desc="Generando imágenes", unit="img") as pbar:
+        with tqdm(total=total_items, desc="Generating images", unit="img") as pbar:
             for split_name, text_data, current_mode in all_texts_with_modes:
                 split_dir = split_dir_map[split_name]
                 split_metadata = split_metadata_map[split_name]
                 text = text_data['text']
                 text_lang = text_data.get('language', self.languages[0] if self.languages else 'unknown')
                 
-                # Obtenir fonts compatibles amb aquest idioma
+                # Obtenir compatible fonts with aquest idioma
                 if text_lang in self.fonts_by_lang:
                     compatible_fonts = self.fonts_by_lang[text_lang]
                 else:
@@ -1465,7 +1465,7 @@ class SyntheticDatasetBuilder:
                                 'quality': perturb_metadata.get('quality', 'clean'),
                             }
                             
-                            # Afegir paràmetres de pertorbació si n'hi ha
+                            # Afegir paràmetres from pertorbació si n'hi ha
                             perturbation_params = {k: v for k, v in perturb_metadata.items() if k != 'quality' and v is not None}
                             if perturbation_params:
                                 metadata_entry['perturbations'] = perturbation_params
@@ -1485,7 +1485,7 @@ class SyntheticDatasetBuilder:
         self._save_metadata_jsonl(self.test_dir / 'metadata.jsonl', test_metadata)
         self._create_dataset_info()
 
-        print(f"  [OK] {self.stats['images_generated']:,} imágenes generadas")
+        print(f"  [OK] {self.stats['images_generated']:,} images generated")
         print(f"    Train: {self.stats['train_samples']:,}")
         print(f"    Validation: {self.stats['val_samples']:,}")
         print(f"    Test: {self.stats['test_samples']:,}")
@@ -1549,24 +1549,24 @@ class SyntheticDatasetBuilder:
     def generate_summary(self):
         """Genera resumen del dataset"""
         print("\n" + "=" * 60)
-        print("RESUMEN DE GENERACIÓN - FORMATO HUGGINGFACE")
+        print("GENERATION SUMMARY - HUGGINGFACE FORMAT")
         print("=" * 60)
         if len(self.modes) > 1:
             mode_dist_str = ', '.join([f"{m}:{int(d*100)}%" for m, d in zip(self.modes, self.mode_distribution)])
-            print(f"Modo: {', '.join(self.modes)} (distribució: {mode_dist_str})")
+            print(f"Mode: {', '.join(self.modes)} (distribution: {mode_dist_str})")
         else:
-            print(f"Modo: {self.modes[0]}")
-        print(f"Estilo: {self.style}")
-        print(f"\nFuentes:")
-        print(f"  Con bold: {self.stats['fonts_with_bold']}")
-        print(f"  Sin bold: {self.stats['fonts_without_bold']}")
-        print(f"  Compatibles usadas: {self.stats['fonts_used']}")
+            print(f"Mode: {self.modes[0]}")
+        print(f"Style: {self.style}")
+        print(f"\nFonts:")
+        print(f"  With bold: {self.stats['fonts_with_bold']}")
+        print(f"  No bold: {self.stats['fonts_without_bold']}")
+        print(f"  Compatible used: {self.stats['fonts_used']}")
         if self.stats['fonts_incompatible'] > 0:
-            print(f"  Incompatibles (caràcters): {self.stats['fonts_incompatible']}")
+            print(f"  Incompatible (characters)): {self.stats['fonts_incompatible']}")
         other_skipped = self.stats['fonts_skipped'] - self.stats['fonts_incompatible']
         if other_skipped > 0:
             print(f"  Saltadas (otras): {other_skipped}")
-        print(f"\nFondos de papel:")
+        print(f"\nBackgrounds from papel:")
         if self.backgrounds:
             bg_summary = defaultdict(int)
             for bg in self.backgrounds:
@@ -1575,30 +1575,30 @@ class SyntheticDatasetBuilder:
                 print(f"  {name}: {bg_summary[name]}")
         else:
             print(f"  Blanco (sin fondos)")
-        print(f"\nPerturbaciones:")
+        print(f"\nPerturbations:")
         if self.perturbations_enabled:
-            print(f"  Estado: ACTIVADAS")
-            print(f"  Distribución configurada: {self.quality_distribution[0]}% clean, {self.quality_distribution[1]}% degraded, {self.quality_distribution[2]}% severe")
-            print(f"  Resultados:")
+            print(f"  Status: ENABLED")
+            print(f"  Configured distribution: {self.quality_distribution[0]}% clean, {self.quality_distribution[1]}% degraded, {self.quality_distribution[2]}% severe")
+            print(f"  Results:")
             print(f"    Clean: {self.stats['quality_clean']:,}")
             print(f"    Degraded: {self.stats['quality_degraded']:,}")
             print(f"    Severe: {self.stats['quality_severe']:,}")
         else:
-            print(f"  Estado: DESACTIVADAS")
-        print(f"\nImágenes generadas:")
+            print(f"  Status: DESENABLED")
+        print(f"\nImages generated:")
         print(f"  Total: {self.stats['images_generated']:,}")
         if self.stats['images_skipped_unsupported'] > 0:
-            print(f"  Saltadas (font no suporta caràcters): {self.stats['images_skipped_unsupported']:,}")
-        # Mostrar estadístiques de modes (ambdós si hi ha modes mixtos)
+            print(f"  Skipped (font unsupported chars)): {self.stats['images_skipped_unsupported']:,}")
+        # Mostrar estadístiques from modes (withdós si hi ha modes mixtos)
         if self.stats['words_generated'] > 0:
-            print(f"  Palabras: {self.stats['words_generated']:,}")
+            print(f"  Words: {self.stats['words_generated']:,}")
         if self.stats['lines_generated'] > 0:
-            print(f"  Líneas: {self.stats['lines_generated']:,}")
+            print(f"  Lines: {self.stats['lines_generated']:,}")
         print(f"\nSplits:")
         print(f"  Train: {self.stats['train_samples']:,} ({self.train_split:.0%})")
         print(f"  Validation: {self.stats['val_samples']:,} ({self.val_split:.0%})")
         print(f"  Test: {self.stats['test_samples']:,} ({self.test_split:.0%})")
-        print(f"\nEstructura del dataset:")
+        print(f"\nDataset structure:")
         print(f"  {self.output_dir.absolute()}/")
         print(f"    ├── train/")
         print(f"    │   ├── metadata.jsonl")
@@ -1615,49 +1615,49 @@ class SyntheticDatasetBuilder:
 
 def main():
     parser = argparse.ArgumentParser(
-        description='Generador de dataset sintético de texto manuscrito multilingüe en formato HuggingFace'
+        description='Generador from dataset sintético from texto manuscrito multilingüe en formato HuggingFace'
     )
-    parser.add_argument('--data-dir', default='data', help='Directorio con textos (default: data)')
+    parser.add_argument('--data-dir', default='data', help='Directorio con texts (default: data)')
     parser.add_argument('--fonts-dir', default='fonts', help='Directorio con fuentes (default: fonts)')
-    parser.add_argument('--output-dir', default='output', help='Directorio base de salida (default: output)')
+    parser.add_argument('--output-dir', default='output', help='Directorio base from salida (default: output)')
     parser.add_argument('--output-name', default=None, help='Nombre personalizado para el output')
     parser.add_argument('--language', default='unknown', help='Idioma del dataset (default: unknown)')
     parser.add_argument('--mode', type=str, default='lines',
-                        help='Mode(s): lines, words, o lines,words per ambdós (default: lines)')
+                        help='Mode(s): lines, words, o lines,words per withdós (default: lines)')
     parser.add_argument('--mode-distribution', type=str, default=None,
-                        help='Distribució de modes en %% (ex: 70,30). Per defecte 50,50 si es passen dos modes')
+                        help='Distribució from modes en %% (ex: 70,30). Per defecte 50,50 si es passen dos modes')
     parser.add_argument('--style', choices=['normal', 'bold'], default='normal',
-                        help='Estilo de fuente: normal o bold (default: normal)')
+                        help='Style from fuente: normal o bold (default: normal)')
     parser.add_argument('--train-split', type=float, default=0.8,
-                        help='Proporción de datos para entrenamiento (default: 0.8)')
+                        help='Proporción from datos para entrenamiento (default: 0.8)')
     parser.add_argument('--val-split', type=float, default=0.1,
-                        help='Proporción de datos para validación (default: 0.1)')
+                        help='Proporción from datos para validación (default: 0.1)')
     parser.add_argument('--max-texts', type=int, default=None,
-                        help='Número máximo de textos a usar (default: todos)')
+                        help='Número máximo from texts a usar (default: todos)')
     parser.add_argument('--total-images', type=int, default=None,
-                        help='Número total de imágenes a generar (calcula textos automáticamente)')
+                        help='Número total from imágenes a generar (calcula texts automáticamente)')
     parser.add_argument('--balanced', action='store_true',
-                        help='Equilibrar número de imágenes por idioma')
+                        help='Equilibrar número from imágenes por idioma')
     parser.add_argument('--font-size', type=int, default=128,
-                        help='Altura de imagen en píxeles (default: 128, compatible con IAM/TrOCR)')
+                        help='Altura from imagen en píxeles (default: 128, compatible con IAM/TrOCR)')
     parser.add_argument('--workers', '-j', type=int, default=1,
-                        help='Número de workers paralelos (default: 1). Usa -1 para todos los cores')
+                        help='Número from workers paralelos (default: 1). Usa -1 para todos los cores')
     parser.add_argument('--max-fonts-per-category', type=int, default=None,
-                        help='Número máximo de fuentes por categoría (default: todas)')
+                        help='Número máximo from fuentes por categoría (default: todas)')
     parser.add_argument('--category-filter', type=str, default=None,
-                        help='Filtrar por categorías de fuente, separadas por comas (ej: Handwritten,School)')
+                        help='Filtrar por categorías from fuente, separadas por comas (ej: Handwritten,School)')
     parser.add_argument('--backgrounds-dir', default='backgrounds',
-                        help='Directorio con fondos de papel (default: backgrounds). Usar "none" para desactivar')
+                        help='Directorio con fondos from papel (default: backgrounds). Usar "none" para desactivar')
     parser.add_argument('--background-color', type=str, default=None,
-                        help='Filtrar por color de fondo, separados por comas (ex: white,grey,beige). Por defecto usa todos')
+                        help='Filtrar por color from fondo, separados por comas (ex: white,grey,beige). Por defecto usa todos')
     parser.add_argument('--background-type', type=str, default=None,
-                        help='Filtrar por tipo de fondo, separados por comas (ex: plain,grid,lined). Por defecto usa todos')
+                        help='Filtrar por tipo from fondo, separados por comas (ex: plain,grid,lined). Por defecto usa todos')
     
     # Perturbation arguments
     parser.add_argument('--perturbations', action='store_true',
                         help='Aplicar perturbaciones realistas a las imágenes (blur, rotación, ruido, etc.)')
     parser.add_argument('--quality-distribution', type=str, default='40,40,20',
-                        help='Distribución de calidad: clean,degraded,severe en porcentajes (default: 40,40,20)')
+                        help='Quality distribution: clean,degraded,severe en porcentajes (default: 40,40,20)')
     
     parser.add_argument('--verbose', '-v', action='store_true',
                         help='Mostrar información detallada')
@@ -1684,21 +1684,21 @@ def main():
         return
 
     print("=" * 60)
-    print("GENERADOR DE DATASET SINTÉTICO - FORMATO HUGGINGFACE")
+    print("GENERADOR DE DATASET SINTÉTICO - HUGGINGFACE FORMAT")
     print("=" * 60)
     if args.output_name:
-        print(f"Nombre de dataset: {args.output_name}")
+        print(f"Nombre from dataset: {args.output_name}")
         print(f"Output: {output_dir}")
     if args.category_filter:
-        print(f"Categoría fonts: {args.category_filter}")
+        print(f"Category fonts: {args.category_filter}")
     if backgrounds_dir:
-        print(f"Fondos: {backgrounds_dir}")
+        print(f"Backgrounds: {backgrounds_dir}")
         if args.background_color:
             print(f"  Color: {args.background_color}")
         if args.background_type:
             print(f"  Tipo: {args.background_type}")
     if args.perturbations:
-        print(f"Perturbaciones: ON ({quality_dist[0]}% clean, {quality_dist[1]}% degraded, {quality_dist[2]}% severe)")
+        print(f"Perturbations: ON ({quality_dist[0]}% clean, {quality_dist[1]}% degraded, {quality_dist[2]}% severe)")
     print()
 
     builder = SyntheticDatasetBuilder(

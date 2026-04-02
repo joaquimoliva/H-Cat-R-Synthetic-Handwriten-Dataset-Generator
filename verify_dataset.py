@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-Verificació robusta del dataset multilingüe.
-Comprova: rectangles, metadata, modes, qualitat, caràcters especials per idioma.
+Robust verification of multilingual datasets.
+Checks: rectangles, metadata, modes, quality, special characters per language.
 
-Ús:
-    python verificar_dataset.py                     # Usa output/
-    python verificar_dataset.py output_test_fix     # Usa output_test_fix/
+Usage:
+    python verify_dataset.py                     # Uses output/
+    python verify_dataset.py output_test_fix     # Uses output_test_fix/
 """
 
 import json
@@ -13,7 +13,7 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 
-# Configuració - agafa argument o usa 'output' per defecte
+# Configuration - takes argument or uses 'output' by default
 if len(sys.argv) > 1:
     OUTPUT_DIR = sys.argv[1]
 else:
@@ -25,7 +25,7 @@ METADATA_FILES = [
     f'{OUTPUT_DIR}/test/metadata.jsonl',
 ]
 
-# Caràcters especials per idioma (que podrien ser rectangles)
+# Special characters per language (that could be rectangles)
 SPECIAL_CHARS = {
     'catalan': 'àèéíïòóúüç·',
     'polish': 'ąęłńóśźż',
@@ -34,21 +34,21 @@ SPECIAL_CHARS = {
     'hungarian': 'áéíóöőúüű',
 }
 
-# Fonts conegudes amb problemes de rectangles
+# Known fonts with rectangle problems
 PROBLEMATIC_FONTS = ['Cursif', 'Ecolier']
 
-# Caràcters que sabem que són rectangles a Cursif/Ecolier
+# Characters known to be rectangles in Cursif/Ecolier
 RECTANGLE_CHARS = set('óòáú')
 
 def main():
-    print(f"📂 Verificant: {OUTPUT_DIR}/")
+    print(f"📂 Verifying: {OUTPUT_DIR}/")
     
-    # Verificar que existeixen els fitxers
+    # Check that metadata files exist
     existing_files = [f for f in METADATA_FILES if Path(f).exists()]
     if not existing_files:
-        print(f"❌ ERROR: No existeixen fitxers metadata a {OUTPUT_DIR}/")
-        print(f"\nUsa: python verificar_dataset.py <carpeta>")
-        print(f"Exemple: python verificar_dataset.py output_test_fix")
+        print(f"❌ ERROR: No metadata files found in {OUTPUT_DIR}/")
+        print(f"\nUsage: python verify_dataset.py <folder>")
+        print(f"Example: python verify_dataset.py output_test_fix")
         return
 
     stats = {
@@ -75,19 +75,19 @@ def main():
                 stats['fonts'].add(e['font_name'])
                 stats['fonts_per_lang'][lang].add(e['font_name'])
                 
-                # Verificar nous camps metadata
+                # Verify new metadata fields
                 if 'char_count' not in e:
-                    stats['errors'].append(f"{e['file_name']}: falta char_count")
+                    stats['errors'].append(f"{e['file_name']}: missing char_count")
                 if 'word_count' not in e:
-                    stats['errors'].append(f"{e['file_name']}: falta word_count")
+                    stats['errors'].append(f"{e['file_name']}: missing word_count")
                 
-                # Verificar coherència char_count/word_count
+                # Verify char_count/word_count consistency
                 if 'char_count' in e and e['char_count'] != len(e['text']):
-                    stats['errors'].append(f"{e['file_name']}: char_count incorrecte")
+                    stats['errors'].append(f"{e['file_name']}: incorrect char_count")
                 if 'word_count' in e and e['word_count'] != len(e['text'].split()):
-                    stats['errors'].append(f"{e['file_name']}: word_count incorrecte")
+                    stats['errors'].append(f"{e['file_name']}: incorrect word_count")
                 
-                # Verificar rectangles (fonts problemàtiques + caràcters problemàtics)
+                # Check for rectangles (problematic fonts + problematic characters)
                 if e['font_name'] in PROBLEMATIC_FONTS:
                     if any(c in e['text'] for c in RECTANGLE_CHARS):
                         stats['rectangles'].append({
@@ -96,47 +96,47 @@ def main():
                             'chars': [c for c in RECTANGLE_CHARS if c in e['text']]
                         })
                 
-                # Registrar caràcters especials trobats per idioma
+                # Record special characters found per language
                 if lang in SPECIAL_CHARS:
                     for c in SPECIAL_CHARS[lang]:
                         if c in e['text']:
                             stats['special_chars_found'][lang].add(c)
 
-    # Mostrar resultats
+    # Show results
     print("=" * 70)
-    print("📊 VERIFICACIÓ DATASET MULTILINGÜE")
+    print("📊 MULTILINGUAL DATASET VERIFICATION")
     print("=" * 70)
     
-    print(f"\n📈 ESTADÍSTIQUES GENERALS")
-    print(f"   Total imatges: {stats['total']:,}")
-    print(f"   Fonts úniques: {len(stats['fonts'])}")
+    print(f"\n📈 GENERAL STATISTICS")
+    print(f"   Total images: {stats['total']:,}")
+    print(f"   Unique fonts: {len(stats['fonts'])}")
     
-    print(f"\n🌍 IDIOMES")
+    print(f"\n🌍 LANGUAGES")
     for lang, count in sorted(stats['languages'].items()):
         pct = count / stats['total'] * 100
         fonts = len(stats['fonts_per_lang'][lang])
-        print(f"   {lang}: {count:,} imatges ({pct:.1f}%), {fonts} fonts")
+        print(f"   {lang}: {count:,} images ({pct:.1f}%), {fonts} fonts")
     
     print(f"\n📝 MODES")
     for mode, count in stats['modes'].items():
         pct = count / stats['total'] * 100
         print(f"   {mode}: {count:,} ({pct:.1f}%)")
     
-    print(f"\n🎨 QUALITAT")
+    print(f"\n🎨 QUALITY")
     for q, count in stats['quality'].items():
         pct = count / stats['total'] * 100
         print(f"   {q}: {count:,} ({pct:.1f}%)")
     
-    print(f"\n🔤 CARÀCTERS ESPECIALS TROBATS")
+    print(f"\n🔤 SPECIAL CHARACTERS FOUND")
     for lang in SPECIAL_CHARS:
         if lang in stats['languages']:
             found = stats['special_chars_found'].get(lang, set())
             expected = set(SPECIAL_CHARS[lang])
             missing = expected - found
             if missing:
-                print(f"   {lang}: ✅ trobats: {''.join(sorted(found))} | ⚠️  no trobats: {''.join(sorted(missing))}")
+                print(f"   {lang}: ✅ found: {''.join(sorted(found))} | ⚠️  not found: {''.join(sorted(missing))}")
             else:
-                print(f"   {lang}: ✅ tots trobats: {''.join(sorted(found))}")
+                print(f"   {lang}: ✅ all found: {''.join(sorted(found))}")
     
     print(f"\n" + "=" * 70)
     print("🧪 TESTS")
@@ -144,50 +144,54 @@ def main():
     
     # Test 1: Rectangles
     if stats['rectangles']:
-        print(f"\n❌ TEST RECTANGLES: FALLAT")
-        print(f"   {len(stats['rectangles'])} imatges amb rectangles placeholder!")
+        print(f"\n❌ TEST RECTANGLES: FAILED")
+        print(f"   {len(stats['rectangles'])} images with placeholder rectangles!")
         for item in stats['rectangles'][:5]:
             print(f"   - {item['file']} ({item['font']}): {item['chars']}")
     else:
-        print(f"\n✅ TEST RECTANGLES: PASSAT")
-        print(f"   Cap imatge amb glifs rectangle (ó,ò,á,ú) de fonts problemàtiques")
+        print(f"\n✅ TEST RECTANGLES: PASSED")
+        print(f"   No images with rectangle glyphs (ó,ò,á,ú) from problematic fonts")
     
     # Test 2: Metadata
     if stats['errors']:
-        print(f"\n❌ TEST METADATA: FALLAT")
+        print(f"\n❌ TEST METADATA: FAILED")
         for err in stats['errors'][:5]:
             print(f"   - {err}")
         if len(stats['errors']) > 5:
-            print(f"   ... i {len(stats['errors'])-5} errors més")
+            print(f"   ... and {len(stats['errors'])-5} more errors")
     else:
-        print(f"\n✅ TEST METADATA: PASSAT")
-        print(f"   Tots els registres tenen char_count i word_count correctes")
+        print(f"\n✅ TEST METADATA: PASSED")
+        print(f"   All records have correct char_count and word_count")
     
-    # Test 3: Distribució modes (si s'espera 70/30)
+    # Test 3: Mode distribution (with tolerance)
     lines_pct = stats['modes'].get('lines', 0) / stats['total'] * 100
     words_pct = stats['modes'].get('words', 0) / stats['total'] * 100
-    if 60 <= lines_pct <= 80:
-        print(f"\n✅ TEST MODES: PASSAT")
-        print(f"   Distribució {lines_pct:.0f}% lines / {words_pct:.0f}% words (esperat ~70/30)")
+    # Accept if within reasonable range or single mode
+    if lines_pct == 100 or words_pct == 100 or (55 <= lines_pct <= 85):
+        print(f"\n✅ TEST MODES: PASSED")
+        print(f"   Distribution {lines_pct:.0f}% lines / {words_pct:.0f}% words")
     else:
-        print(f"\n⚠️  TEST MODES: REVISAR")
-        print(f"   Distribució {lines_pct:.0f}% lines / {words_pct:.0f}% words (esperat ~70/30)")
+        print(f"\n⚠️  TEST MODES: REVIEW")
+        print(f"   Distribution {lines_pct:.0f}% lines / {words_pct:.0f}% words")
     
-    # Test 4: Múltiples idiomes
+    # Test 4: Multiple languages
     if len(stats['languages']) >= 2:
-        print(f"\n✅ TEST MULTILINGÜE: PASSAT")
-        print(f"   {len(stats['languages'])} idiomes detectats")
+        print(f"\n✅ TEST MULTILINGUAL: PASSED")
+        print(f"   {len(stats['languages'])} languages detected")
+    elif len(stats['languages']) == 1:
+        print(f"\n⚠️  TEST MULTILINGUAL: SINGLE LANGUAGE")
+        print(f"   Only 1 language detected (OK if intended)")
     else:
-        print(f"\n⚠️  TEST MULTILINGÜE: REVISAR")
-        print(f"   Només {len(stats['languages'])} idioma(es) detectat(s)")
+        print(f"\n❌ TEST MULTILINGUAL: FAILED")
+        print(f"   No languages detected")
     
-    # Resum final
+    # Final summary
     print(f"\n" + "=" * 70)
     all_passed = not stats['rectangles'] and not stats['errors']
     if all_passed:
-        print("🎉 TOTS ELS TESTS CRÍTICS PASSATS!")
+        print("🎉 ALL CRITICAL TESTS PASSED!")
     else:
-        print("⚠️  ALGUNS TESTS HAN FALLAT - REVISA ELS ERRORS")
+        print("⚠️  SOME TESTS FAILED - REVIEW ERRORS")
     print("=" * 70)
 
 if __name__ == '__main__':

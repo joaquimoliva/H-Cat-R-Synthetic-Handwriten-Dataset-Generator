@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Script para scrapear libros validados de Wikisource en catalán
-Objetivo: Crear dataset sintético de líneas y palabras
+Script to scrape validated books from Catalan Wikisource
+Goal: Create synthetic dataset of lines and words
 """
 
 import requests
@@ -24,11 +24,11 @@ class WikisourceScraper:
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
         }
 
-        # Crear directorio de salida
+        # Create output directory
         self.output_dir.mkdir(exist_ok=True)
 
     def get_page(self, url):
-        """Obtiene el contenido de una página"""
+        """Get page content"""
         try:
             if self.verbose:
                 print(f"    Fetching: {url}")
@@ -40,7 +40,7 @@ class WikisourceScraper:
             return None
 
     def sanitize_filename(self, filename):
-        """Sanitiza el nombre del archivo"""
+        """Sanitize filename"""
         filename = re.sub(r'[<>:"/\\|?*]', '_', filename)
         filename = re.sub(r'\s+', '_', filename)
         if len(filename) > 200:
@@ -48,10 +48,10 @@ class WikisourceScraper:
         return filename
 
     def get_validated_books(self):
-        """Obtiene la lista de libros validados de la categoría"""
+        """Get list of validated books from category"""
         url = "https://ca.wikisource.org/wiki/Categoria:Llibres_validats"
 
-        print("[1] Obteniendo lista de libros validados...")
+        print("[1] Getting list of validated books...")
         html = self.get_page(url)
         if not html:
             return []
@@ -59,11 +59,11 @@ class WikisourceScraper:
         soup = BeautifulSoup(html, 'html.parser')
         books = []
 
-        # Buscar todos los grupos de categoría
+        # Find all category groups
         category_groups = soup.find_all('div', class_='mw-category-group')
 
         for group in category_groups:
-            # Encontrar todos los enlaces en el grupo
+            # Find all links in group
             links = group.find_all('a')
             for link in links:
                 if link.get('href'):
@@ -74,11 +74,11 @@ class WikisourceScraper:
                         'url': book_url
                     })
 
-        print(f"  [OK] Encontrados {len(books)} libros validados")
+        print(f"  [OK] Found {len(books)} validated books")
         return books
 
     def get_validated_pages(self, book_url):
-        """Obtiene las páginas validadas de un libro"""
+        """Get validated pages from a book"""
         html = self.get_page(book_url)
         if not html:
             return []
@@ -86,14 +86,14 @@ class WikisourceScraper:
         soup = BeautifulSoup(html, 'html.parser')
         validated_pages = []
 
-        # Buscar la lista de páginas del índice
+        # Find page list from index
         pagelist = soup.find('div', class_='prp-index-pagelist')
         if not pagelist:
             if self.verbose:
-                print(f"    [WARNING] No se encontró prp-index-pagelist")
+                print(f"    [WARNING] Not found prp-index-pagelist")
             return []
 
-        # Buscar enlaces con quality4 (páginas validadas)
+        # Find links with quality4 (validated pages)
         quality4_links = pagelist.find_all('a', class_=lambda x: x and 'prp-pagequality-4' in x and 'quality4' in x)
 
         for link in quality4_links:
@@ -106,12 +106,12 @@ class WikisourceScraper:
                 })
 
         if self.verbose:
-            print(f"    [OK] Encontradas {len(validated_pages)} páginas validadas")
+            print(f"    [OK] Found {len(validated_pages)} validated pages")
 
         return validated_pages
 
     def extract_page_content(self, page_url):
-        """Extrae el contenido de texto de una página"""
+        """Extract text content from a page"""
         html = self.get_page(page_url)
         if not html:
             return None
@@ -123,7 +123,7 @@ class WikisourceScraper:
 
         if not quality_header:
             if self.verbose:
-                print(f"    [WARNING] No se encontró prp-page-qualityheader quality4")
+                print(f"    [WARNING] Not found prp-page-qualityheader quality4")
             return None
 
         # Buscar el hermano siguiente que es pagetext
@@ -131,7 +131,7 @@ class WikisourceScraper:
 
         if not pagetext:
             if self.verbose:
-                print(f"    [WARNING] No se encontró pagetext después de quality4")
+                print(f"    [WARNING] Not found pagetext después de quality4")
             return None
 
         # Dentro de pagetext, buscar mw-content-ltr mw-parser-output
@@ -139,16 +139,16 @@ class WikisourceScraper:
 
         if not page_content:
             if self.verbose:
-                print(f"    [WARNING] No se encontró mw-content-ltr mw-parser-output dentro de pagetext")
+                print(f"    [WARNING] Not found mw-content-ltr mw-parser-output dentro de pagetext")
             return None
 
-        # Extraer texto
+        # Extract text
         # Eliminar scripts, styles, etc.
         #for tag in page_content(['script', 'style', 'sup', 'ref']):  #CANVI
         for tag in page_content(['script', 'style', 'sup', 'ref', 'img', 'figure', 'figcaption']):
             tag.decompose()
 
-        # Obtener texto
+        # Get text
         text = page_content.get_text(separator='\n', strip=True)
 
         # Limpiar texto
@@ -162,21 +162,21 @@ class WikisourceScraper:
         }
 
     def save_content(self, book_title, page_title, content, book_index, page_index):
-        """Guarda el contenido extraído"""
-        # Crear estructura de carpetas: data/[libro]/
+        """Save extracted content"""
+        # Create folder structure: data/[libro]/
         safe_book_name = self.sanitize_filename(book_title)
         book_dir = self.output_dir / safe_book_name
         book_dir.mkdir(exist_ok=True)
 
-        # Nombre del archivo de página
+        # Page filename
         safe_page_name = self.sanitize_filename(page_title)
 
-        # Guardar como texto plano
+        # Save as plain text
         txt_file = book_dir / f"{page_index:04d}_{safe_page_name}.txt"
         with open(txt_file, 'w', encoding='utf-8') as f:
             f.write(content['text'])
 
-        # Guardar metadatos como JSON
+        # Save metadata as JSON
         json_file = book_dir / f"{page_index:04d}_{safe_page_name}.json"
         metadata = {
             'book_title': book_title,
@@ -190,46 +190,46 @@ class WikisourceScraper:
             json.dump(metadata, f, ensure_ascii=False, indent=2)
 
         if self.verbose:
-            print(f"    [SAVED] {txt_file.name} ({content['num_lines']} líneas, {content['num_words']} palabras)")
+            print(f"    [SAVED] {txt_file.name} ({content['num_lines']} lines, {content['num_words']} words)")
 
     def scrape_all(self, max_books=None, start_from_book=None):
-        """Scrape completo de Wikisource catalán"""
+        """Complete Catalan Wikisource scrape"""
         print("=" * 60)
-        print("WIKISOURCE CATALÁN - SCRAPER DE LIBROS VALIDADOS")
+        print("CATALAN WIKISOURCE - VALIDATED BOOKS SCRAPER")
         print("=" * 60)
         print()
 
-        # Obtener lista de libros
+        # Get list of books
         books = self.get_validated_books()
 
         if not books:
-            print("[ERROR] No se encontraron libros")
+            print("[ERROR] No books found")
             return
 
-        # Si se especifica un libro de inicio, empezar desde el siguiente
+        # If start book specified, start from the next one
         if start_from_book:
-            # Buscar el libro en la lista
+            # Find book in list
             found_index = None
             for idx, book in enumerate(books):
                 if start_from_book.lower() in book['title'].lower():
                     found_index = idx
-                    print(f"\n[INFO] Encontrado libro de referencia: {book['title']}")
+                    print(f"\n[INFO] Found reference book: {book['title']}")
                     break
 
             if found_index is not None:
                 # Empezar desde el siguiente libro
                 books = books[found_index + 1:]
-                print(f"[INFO] Empezando desde el siguiente libro (saltando {found_index + 1} libros)")
+                print(f"[INFO] Starting from next book (skipping {found_index + 1} books)")
             else:
-                print(f"\n[WARNING] No se encontró el libro '{start_from_book}'")
-                print("[INFO] Se procesarán todos los libros")
+                print(f"\n[WARNING] Not found el libro '{start_from_book}'")
+                print("[INFO] Se procesarán todos los books")
 
-        # Limitar número de libros si se especifica
+        # Limitar número de books si se especifica
         if max_books:
             books = books[:max_books]
-            print(f"\n[INFO] Limitado a {max_books} libros")
+            print(f"\n[INFO] Limited to {max_books} books")
 
-        print(f"\n[2] Procesando {len(books)} libros...")
+        print(f"\n[2] Processing {len(books)} books...")
         print("=" * 60)
 
         total_pages = 0
@@ -238,28 +238,28 @@ class WikisourceScraper:
 
         # Procesar cada libro
         for book_idx, book in enumerate(books, 1):
-            print(f"\n[{book_idx}/{len(books)}] Libro: {book['title']}")
+            print(f"\n[{book_idx}/{len(books)}] Book: {book['title']}")
             print(f"  URL: {book['url']}")
 
-            # Obtener páginas validadas
+            # Obtener validated pages
             pages = self.get_validated_pages(book['url'])
 
             if not pages:
-                print(f"  [SKIP] No hay páginas validadas")
+                print(f"  [SKIP] No hay validated pages")
                 continue
 
-            print(f"  [INFO] Procesando {len(pages)} páginas validadas...")
+            print(f"  [INFO] Processing {len(pages)} validated pages...")
 
             # Procesar cada página
             for page_idx, page in enumerate(pages, 1):
                 if self.verbose:
-                    print(f"  [{page_idx}/{len(pages)}] Página: {page['title']}")
+                    print(f"  [{page_idx}/{len(pages)}] Page: {page['title']}")
 
-                # Extraer contenido
+                # Extract content
                 content = self.extract_page_content(page['url'])
 
                 if content and content['num_lines'] > 0:
-                    # Guardar contenido
+                    # Save content
                     self.save_content(
                         book['title'],
                         page['title'],
@@ -273,34 +273,34 @@ class WikisourceScraper:
                     total_words += content['num_words']
                 else:
                     if self.verbose:
-                        print(f"    [SKIP] Sin contenido válido")
+                        print(f"    [SKIP] No valid content")
 
-                # Delay entre páginas
+                # Delay between pages
                 time.sleep(self.delay)
 
-            # Delay entre libros
+            # Delay entre books
             time.sleep(self.delay * 2)
 
-        # Resumen final
+        # Final summary
         print("\n" + "=" * 60)
-        print("RESUMEN FINAL")
+        print("FINAL SUMMARY")
         print("=" * 60)
-        print(f"  Libros procesados: {len(books)}")
-        print(f"  Páginas guardadas: {total_pages}")
-        print(f"  Total líneas: {total_lines:,}")
-        print(f"  Total palabras: {total_words:,}")
-        print(f"\n[SUCCESS] Dataset guardado en: {self.output_dir.absolute()}")
+        print(f"  Books processed: {len(books)}")
+        print(f"  Pages saved: {total_pages}")
+        print(f"  Total lines: {total_lines:,}")
+        print(f"  Total words: {total_words:,}")
+        print(f"\n[SUCCESS] Dataset saved in: {self.output_dir.absolute()}")
         print()
 
 def main():
     parser = argparse.ArgumentParser(
-        description='Scraper de Wikisource en catalán para crear dataset sintético'
+        description='Catalan Wikisource scraper to create synthetic dataset'
     )
-    parser.add_argument('--output-dir', default='data', help='Directorio de salida (default: data)')
-    parser.add_argument('--max-books', type=int, default=None, help='Número máximo de libros a procesar')
-    parser.add_argument('--start-from-book', type=str, default=None, help='Título del libro desde el cual empezar (scrapeará desde el siguiente)')
-    parser.add_argument('--delay', type=float, default=1.0, help='Delay entre requests en segundos (default: 1.0)')
-    parser.add_argument('--verbose', '-v', action='store_true', help='Mostrar información detallada')
+    parser.add_argument('--output-dir', default='data', help='Output directory (default: data)')
+    parser.add_argument('--max-books', type=int, default=None, help='Número máximo de books a procesar')
+    parser.add_argument('--start-from-book', type=str, default=None, help='Book title to start from (will scrape from the next one)')
+    parser.add_argument('--delay', type=float, default=1.0, help='Delay between requests in seconds (default: 1.0)')
+    parser.add_argument('--verbose', '-v', action='store_true', help='Show detailed information')
 
     args = parser.parse_args()
 
