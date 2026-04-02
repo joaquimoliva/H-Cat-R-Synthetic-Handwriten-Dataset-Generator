@@ -175,6 +175,8 @@ The framework supports **35 languages** with Latin script. Each language has a c
 
 **Note:** `--mode-distribution` applies to **images**, not texts. The system calculates optimal text-to-mode assignment automatically.
 
+> ⚠️ **Minimum dataset size:** The `--mode-distribution` parameter works accurately for datasets of **2,000+ images**. For smaller datasets, the granularity of image generation may prevent achieving the exact target distribution. This occurs because selecting 'words' mode for a single text generates approximately 10× more images than 'lines' mode (one image per word × number of fonts vs. one image per sentence × number of fonts).
+
 ### Background Parameters
 
 | Argument | Default | Description |

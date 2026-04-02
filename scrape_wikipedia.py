@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Script to download Wikipedia texts in any language
+Script to download texts from Wikipedia in any language
 using the MediaWiki API.
 Goal: Create text corpus for synthetic handwriting dataset.
-Compatible with build_dataset.py pipeline
+Compatible with the build_dataset.py pipeline
 """
 
 import requests
@@ -30,12 +30,12 @@ class WikipediaScraper:
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
     def get_random_articles(self, count=20):
-        """Get a list of random articles"""
+        """Gets a list of random articles"""
         params = {
             'action': 'query',
             'format': 'json',
             'list': 'random',
-            'rnnamespace': 0,  # Articles only (namespace 0)
+            'rnnamespace': 0,  # Only articles (namespace 0)
             'rnlimit': min(count, 20)  # API limits to 20 per request
         }
 
@@ -69,7 +69,7 @@ class WikipediaScraper:
         return articles
 
     def get_articles_from_category(self, category, max_articles=100):
-        """Get articles from a specific category"""
+        """Gets articles from a specific category"""
         params = {
             'action': 'query',
             'format': 'json',
@@ -110,7 +110,7 @@ class WikipediaScraper:
         return articles[:max_articles]
 
     def get_article_text(self, title):
-        """Extract clean text from article using API"""
+        """Extracts clean text from an article using the API"""
         params = {
             'action': 'query',
             'format': 'json',
@@ -158,14 +158,14 @@ class WikipediaScraper:
             return None
 
     def _clean_text(self, text):
-        """Clean text extracted from Wikipedia"""
+        """Cleans the text extracted from Wikipedia"""
         # Remove unwanted sections
         sections_to_remove = [
             'Referències', 'References', 'Bibliografía', 'Bibliography',
             'Enllaços externs', 'External links', 'Enlaces externos',
             'Vegeu també', 'See also', 'Véase también',
             'Notes', 'Notas', 'Footnotes',
-            'Fonts', 'Sources', 'Fuentes',
+            'Fonts', 'Sources', 'Sources',
             'Lectura addicional', 'Further reading', 'Lectura adicional'
         ]
 
@@ -173,7 +173,7 @@ class WikipediaScraper:
             pattern = rf'==\s*{re.escape(section)}\s*==.*'
             text = re.split(pattern, text, flags=re.IGNORECASE)[0]
 
-        # Remove section headers (== Título ==)
+        # Remove section headers (== Title ==)
         text = re.sub(r'={2,}.*?={2,}', '', text)
 
         # Remove content in braces (residual templates)
@@ -188,7 +188,7 @@ class WikipediaScraper:
         # Remove lines that are only numbers (residual tables)
         text = re.sub(r'^[\d\s.,]+$', '', text, flags=re.MULTILINE)
 
-        # Remove very short lines (< 10 chars) that are usually residue
+        # Remove very short lines (< 10 characters) which are usually residue
         lines = text.split('\n')
         lines = [line.strip() for line in lines if len(line.strip()) >= 10]
 
@@ -201,7 +201,7 @@ class WikipediaScraper:
         return '\n'.join(cleaned_lines)
 
     def sanitize_filename(self, filename):
-        """Sanitize filename"""
+        """Sanitizes the file name"""
         filename = re.sub(r'[<>:"/\\|?*]', '_', filename)
         filename = re.sub(r'\s+', '_', filename)
         if len(filename) > 200:
@@ -209,7 +209,7 @@ class WikipediaScraper:
         return filename
 
     def save_content(self, article_title, content, article_index):
-        """Save extracted content in same format as scrape_wikisource"""
+        """Saves extracted content in the same format as scrape_wikisource"""
         safe_name = self.sanitize_filename(article_title)
 
         # Save as plain text
@@ -244,7 +244,7 @@ class WikipediaScraper:
             print(f"  Category: {category}")
         print()
 
-        # Obtener lista de articles
+        # Get list of articles
         if category:
             print(f"[1] Getting articles from category '{category}'...")
             articles = self.get_articles_from_category(category, max_articles)
@@ -258,7 +258,7 @@ class WikipediaScraper:
 
         print(f"  [OK] Found {len(articles)} articles")
 
-        print(f"\n[2] Procesando articles...")
+        print(f"\n[2] Processing articles...")
         print("=" * 60)
 
         total_articles = 0
@@ -268,7 +268,7 @@ class WikipediaScraper:
         for idx, article in enumerate(articles, 1):
             print(f"\n[{idx}/{len(articles)}] Article: {article['title']}")
 
-            # Extraer contenido
+            # Extract content
             content = self.get_article_text(article['title'])
 
             if content and content['num_lines'] > 0 and content['num_words'] >= 20:
@@ -281,10 +281,10 @@ class WikipediaScraper:
                 if self.verbose:
                     print(f"    [SKIP] Insufficient content")
 
-            # Delay entre peticiones
+            # Delay between requests
             time.sleep(self.delay)
 
-        # Resumen final
+        # Final summary
         print("\n" + "=" * 60)
         print("FINAL SUMMARY")
         print("=" * 60)
@@ -298,16 +298,16 @@ class WikipediaScraper:
 
 def main():
     parser = argparse.ArgumentParser(
-        description='Wikipedia scraper to create multilingual text corpus'
+        description='Wikipedia scraper for creating multilingual text corpus'
     )
     parser.add_argument('--language', '-l', default='ca',
                         help='Language code (default: ca). Examples: ca, es, eu, gl, en, fr, de, it')
     parser.add_argument('--output-dir', default='data',
-                        help='Base output directory (default: data). Subfolder created wikipedia_[idioma]/')
+                        help='Base output directory (default: data). Creates subfolder wikipedia_[language]/')
     parser.add_argument('--max-articles', type=int, default=100,
-                        help='Número máximo de articles a descargar (default: 100)')
+                        help='Maximum number of articles to download (default: 100)')
     parser.add_argument('--category', type=str, default=None,
-                        help='Categoría de Wikipedia de la que obtener articles (opcional)')
+                        help='Wikipedia category to get articles from (optional)')
     parser.add_argument('--delay', type=float, default=1.0,
                         help='Delay between requests in seconds (default: 1.0)')
     parser.add_argument('--verbose', '-v', action='store_true',

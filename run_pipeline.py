@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
 """
-Script orquestrador del pipeline complet de generació de datasets sintètics.
-Executa tots els passos en ordre amb una sola comanda.
+Orchestrator script for the complete synthetic dataset generation pipeline.
+Executes all steps in order with a single command.
 
-Ús bàsic:
+Basic usage:
     python run_pipeline.py --language catalan -v
 
-Ús amb tots els paràmetres:
+Usage with all parameters:
     python run_pipeline.py --language catalan --max-articles 100 --font-pages 10 --mode lines --category-filter Handwritten --background-color white,grey --background-type lined,grid --workers -1 -v
 
-Amb pertorbacions:
+With perturbations:
     python run_pipeline.py --language catalan --perturbations --quality-distribution 40,40,20 -v
 
-Saltar passos:
+Skip steps:
     python run_pipeline.py --language catalan --skip-text --skip-fonts -v
 """
 
@@ -25,7 +25,7 @@ import shutil
 
 
 def run_step(step_name, command, verbose=False):
-    """Executa un pas del pipeline i mostra el resultat"""
+    """Executes a pipeline step and shows the result"""
     separator = "=" * 60
     print(f"\n{separator}")
     print(f"  STEP: {step_name}")
@@ -47,7 +47,7 @@ def run_step(step_name, command, verbose=False):
 
 
 def load_language_config(language):
-    """Carrega la configuració de l'idioma"""
+    """Loads the language configuration"""
     config_path = Path(__file__).parent / 'languages' / f'{language}.json'
     if not config_path.exists():
         available = [p.stem for p in (Path(__file__).parent / 'languages').glob('*.json')]
@@ -61,123 +61,123 @@ def load_language_config(language):
 
 def main():
     parser = argparse.ArgumentParser(
-        description='Pipeline complet de generació de datasets sintètics de escritura manuscrita',
+        description='Complete pipeline for synthetic handwriting dataset generation',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-Exemples:
-  # Pipeline complet per a català (prova ràpida)
+Examples:
+  # Complete pipeline for catalan (quick test)
   python run_pipeline.py --language catalan --max-articles 10 --font-pages 2 --max-fonts-per-category 5 --max-texts 50 -v
 
-  # Amb filtres de fons
+  # With background filters
   python run_pipeline.py --language catalan --background-color grey --background-type lined --skip-text --skip-fonts -v
 
-  # Amb pertorbacions realistes
+  # With realistic perturbations
   python run_pipeline.py --language catalan --perturbations --quality-distribution 40,40,20 -v
 
-  # Més images degradades (entrenament robust)
+  # More degraded images (robust training)
   python run_pipeline.py --language catalan --perturbations --quality-distribution 20,50,30 -v
 
-  # Sense fons (només blanc llis)
+  # Without backgrounds (white only)
   python run_pipeline.py --language catalan --no-backgrounds --skip-text --skip-fonts -v
 
-  # Només generar dataset (textos i fonts ja descarregats)
+  # Only generate dataset (texts and fonts already downloaded)
   python run_pipeline.py --language catalan --skip-text --skip-fonts -v
         """
     )
 
-    # Paràmetres generals
+    # General parameters
     parser.add_argument('--language', '-l', required=True,
-                        help='Idioma/es separats per comes (ex: catalan o catalan,spanish,french)')
+                        help='Language(s) comma-separated (e.g.: catalan or catalan,spanish,french)')
     parser.add_argument('--verbose', '-v', action='store_true',
-                        help='Mostrar informació detallada')
+                        help='Show detailed information')
 
-    # Control de passos
+    # Step control
     parser.add_argument('--skip-text', action='store_true',
-                        help='Saltar la descàrrega de textos')
+                        help='Skip text download')
     parser.add_argument('--skip-fonts', action='store_true',
-                        help='Saltar la descàrrega i verificació de fonts')
+                        help='Skip font download and verification')
     parser.add_argument('--skip-dataset', action='store_true',
-                        help='Saltar la generació del dataset')
+                        help='Skip dataset generation')
 
-    # Paràmetres de textos
+    # Text parameters
     parser.add_argument('--text-source', choices=['wikipedia', 'wikisource'], default='wikipedia',
-                        help='Font de textos (default: wikipedia)')
+                        help='Text source (default: wikipedia)')
     parser.add_argument('--max-articles', type=int, default=100,
-                        help='Nombre màxim d\'articles a descarregar (default: 100)')
+                        help='Maximum number of articles to download (default: 100)')
 
-    # Paràmetres de fonts
+    # Font parameters
     parser.add_argument('--font-pages', type=int, default=5,
-                        help='Pàgines a escanejar dins la categoria seleccionada (default: 5)')
+                        help='Pages to scan within selected category (default: 5)')
 
-    # Paràmetres de fons
+    # Background parameters
     parser.add_argument('--background-color', type=str, default=None,
-                        help='Colors de fons, separats per comes (ex: white,grey,beige). Per defecte usa tots')
+                        help='Background colors, comma-separated (e.g.: white,grey,beige). Uses all by default')
     parser.add_argument('--background-type', type=str, default=None,
-                        help='Tipus de fons, separats per comes (ex: plain,grid,lined). Per defecte usa tots')
+                        help='Background types, comma-separated (e.g.: plain,grid,lined). Uses all by default')
     parser.add_argument('--no-backgrounds', action='store_true',
-                        help='Desactivar fons de paper (només blanc llis)')
+                        help='Disable paper backgrounds (white only)')
 
-    # Paràmetres de pertorbacions
+    # Perturbation parameters
     parser.add_argument('--perturbations', action='store_true',
-                        help='Aplicar pertorbacions realistes (blur, rotació, soroll, etc.)')
+                        help='Apply realistic perturbations (blur, rotation, noise, etc.)')
     parser.add_argument('--quality-distribution', type=str, default='40,40,20',
-                        help='Distribució de qualitat: clean,degraded,severe en %% (default: 40,40,20)')
+                        help='Quality distribution: clean,degraded,severe in %% (default: 40,40,20)')
 
-    # Paràmetres de generació
+    # Generation parameters
     parser.add_argument('--mode', type=str, default='lines',
-                        help='Mode(s) de generació: lines, words, o lines,words per ambdós')
+                        help='Generation mode(s): lines, words, or lines,words for both')
     parser.add_argument('--mode-distribution', type=str, default=None,
-                        help='Distribució de modes en %% (ex: 70,30 per 70%% lines, 30%% words)')
+                        help='Mode distribution in %% (e.g.: 70,30 for 70%% lines, 30%% words)')
     parser.add_argument('--style', choices=['normal', 'bold'], default='normal',
-                        help='Estil de font (default: normal)')
+                        help='Font style (default: normal)')
     parser.add_argument('--category-filter', type=str, default='Handwritten',
-                        help='Filtrar per categories de font, separades per comes (default: Handwritten)')
+                        help='Filter by font categories, comma-separated (default: Handwritten)')
     parser.add_argument('--max-fonts-per-category', type=int, default=None,
-                        help='Màxim de fonts per categoria')
+                        help='Maximum fonts per category')
     parser.add_argument('--max-texts', type=int, default=None,
-                        help='Màxim de textos a usar')
+                        help='Maximum texts to use')
     parser.add_argument('--total-images', type=int, default=None,
-                        help='Nombre total d\'images a generar (equilibrat entre languages)')
+                        help='Total number of images to generate (balanced between languages)')
     parser.add_argument('--workers', '-j', type=int, default=-1,
-                        help='Workers paral·lels, -1 per tots els nuclis (default: -1)')
+                        help='Parallel workers, -1 for all cores (default: -1)')
     parser.add_argument('--output-name', type=str, default=None,
-                        help='Nom personalitzat per la carpeta output')
+                        help='Custom name for output folder')
 
     args = parser.parse_args()
 
-    # Parsejar languages (separats per comes)
+    # Parse languages (comma-separated)
     languages = [lang.strip() for lang in args.language.split(',')]
     
-    # Calcular max_articles automàticament si s'especifica --total-images
-    # i no s'ha especificat --max-articles explícitament
+    # Auto-calculate max_articles if --total-images is specified
+    # and --max-articles was not explicitly set
     auto_articles = False
     if args.total_images and not args.skip_text:
-        # Estimar fonts disponibles
+        # Estimate available fonts
         estimated_fonts = args.max_fonts_per_category if args.max_fonts_per_category else 25
         
-        # Calcular textos necessaris per idioma
+        # Calculate texts needed per language
         images_per_lang = args.total_images // len(languages)
-        # Mínim 3 textos per idioma per fer split adequat
+        # Minimum 3 texts per language for proper split
         MIN_TEXTS_PER_LANG = 3
         max_fonts_for_texts = images_per_lang // MIN_TEXTS_PER_LANG
         fonts_to_use = min(estimated_fonts, max_fonts_for_texts) if max_fonts_for_texts > 0 else estimated_fonts
         texts_per_lang = max(MIN_TEXTS_PER_LANG, images_per_lang // fonts_to_use)
         
-        # Estimar articles necessaris (aprox 30 frases útils per article, ×2 marge)
-        FRASES_PER_ARTICLE = 30
+        # Estimate needed articles (approx 30 useful sentences per article, x2 margin)
+        SENTENCES_PER_ARTICLE = 30
         SAFETY_MARGIN = 2.0
-        articles_needed = int((texts_per_lang / FRASES_PER_ARTICLE) * SAFETY_MARGIN) + 5
-        articles_needed = max(10, articles_needed)  # Mínim 10 articles
+        articles_needed = int((texts_per_lang / SENTENCES_PER_ARTICLE) * SAFETY_MARGIN) + 5
+        articles_needed = max(10, articles_needed)  # Minimum 10 articles
         
-        # Si el valor calculat és diferent del default (100), actualitzar
+        # If calculated value differs from default (100), update
         if articles_needed != args.max_articles:
             args.max_articles = articles_needed
             auto_articles = True
     
-    # Validar quality-distribution
+    # Validate quality-distribution
     quality_dist = args.quality_distribution.split(',')
     if len(quality_dist) != 3:
-        print(f"[ERROR] --quality-distribution must have 3 comma-separated values (ex: 40,40,20)")
+        print(f"[ERROR] --quality-distribution must have 3 comma-separated values (e.g.: 40,40,20)")
         sys.exit(1)
     try:
         quality_values = [int(x) for x in quality_dist]
@@ -188,7 +188,7 @@ Exemples:
         print(f"[ERROR] --quality-distribution must contain integers")
         sys.exit(1)
 
-    # Validar tots els languages abans de començar
+    # Validate all languages before starting
     lang_configs = {}
     for lang in languages:
         lang_configs[lang] = load_language_config(lang)
@@ -203,16 +203,16 @@ Exemples:
     print(f"  Text source: {args.text_source}")
     mode_str = args.mode
     if ',' in args.mode and args.mode_distribution:
-        mode_str += f" (distribució: {args.mode_distribution})"
+        mode_str += f" (distribution: {args.mode_distribution})"
     elif ',' in args.mode:
-        mode_str += " (distribució: 50,50)"
+        mode_str += " (distribution: 50,50)"
     print(f"  Mode: {mode_str}")
     print(f"  Font category: {args.category_filter}")
     if args.no_backgrounds:
         print(f"  Backgrounds: disabled (white only)")
     else:
-        bg_color_str = args.background_color if args.background_color else "tots"
-        bg_type_str = args.background_type if args.background_type else "tots"
+        bg_color_str = args.background_color if args.background_color else "all"
+        bg_type_str = args.background_type if args.background_type else "all"
         print(f"  Background color: {bg_color_str}")
         print(f"  Background type: {bg_type_str}")
     if args.perturbations:
@@ -233,7 +233,7 @@ Exemples:
     success = True
 
     # ============================================================
-    # PASSOS 1-4: Per cada idioma, descarregar textos i fonts
+    # STEPS 1-4: For each language, download texts and fonts
     # ============================================================
     for lang_idx, lang in enumerate(languages):
         lang_config = lang_configs[lang]
@@ -241,11 +241,11 @@ Exemples:
         
         if len(languages) > 1:
             print(f"\n{'='*60}")
-            print(f"  PROCESSANT IDIOMA {lang_idx+1}/{len(languages)}: {lang} ({lang_code})")
+            print(f"  PROCESSING LANGUAGE {lang_idx+1}/{len(languages)}: {lang} ({lang_code})")
             print(f"{'='*60}")
 
         # ============================================================
-        # PAS 1: Descarregar textos (per cada idioma)
+        # STEP 1: Download texts (for each language)
         # ============================================================
         if not args.skip_text:
             if args.text_source == 'wikipedia':
@@ -261,21 +261,21 @@ Exemples:
                 ] + verbose_flag
 
             success = run_step(
-                f"1/6 - Descarregar textos ({args.text_source}, {lang})",
+                f"1/6 - Download texts ({args.text_source}, {lang})",
                 cmd, args.verbose
             )
             if not success:
-                print(f"\n[ABORT] Pipeline aturat per error al pas 1 ({lang})")
+                print(f"\n[ABORT] Pipeline stopped at step 1 ({lang})")
                 sys.exit(1)
         else:
             if lang_idx == 0:
-                print("\n[SKIP] Pas 1 - Text download (saltat)")
+                print("\n[SKIP] Step 1 - Text download (skipped)")
 
         # ============================================================
-        # PAS 2-4: Fonts (només una vegada, amb el primer idioma)
+        # STEPS 2-4: Fonts (only once, with the first language)
         # ============================================================
         if lang_idx == 0 and not args.skip_fonts:
-            # PAS 2: Escanejar fonts a DaFont (per TOTS els languages)
+            # STEP 2: Scan fonts on DaFont (for ALL languages)
             all_languages_str = ','.join(languages)
             cmd = [
                 sys.executable, 'scrape_dafont.py',
@@ -285,14 +285,14 @@ Exemples:
             ] + verbose_flag
 
             success = run_step(
-                f"2/6 - Escanejar fonts compatibles ({all_languages_str})",
+                f"2/6 - Scan compatible fonts ({all_languages_str})",
                 cmd, args.verbose
             )
             if not success:
-                print("\n[ABORT] Pipeline aturat per error al pas 2")
+                print("\n[ABORT] Pipeline stopped at step 2")
                 sys.exit(1)
 
-            # PAS 3: Descarregar fonts
+            # STEP 3: Download fonts
             csv_file = 'compatible_fonts.csv'
 
             if Path(csv_file).exists():
@@ -303,35 +303,35 @@ Exemples:
                 ]
 
                 success = run_step(
-                    "3/6 - Descarregar fonts",
+                    "3/6 - Download fonts",
                     cmd, args.verbose
                 )
                 if not success:
-                    print("\n[ABORT] Pipeline aturat per error al pas 3")
+                    print("\n[ABORT] Pipeline stopped at step 3")
                     sys.exit(1)
             else:
-                print(f"\n[ABORT] No s'ha trobat {csv_file}")
-                print(f"  El pas 2 (scrape_dafont.py) hauria d'haver-lo creat.")
+                print(f"\n[ABORT] File not found: {csv_file}")
+                print(f"  Step 2 (scrape_dafont.py) should have created it.")
                 sys.exit(1)
 
-            # PAS 4: Verificar i netejar fonts (per TOTS els languages)
+            # STEP 4: Verify and clean fonts (for ALL languages)
             cmd = [
                 sys.executable, 'verify_and_clean_fonts.py',
                 '--language', all_languages_str,
             ] + verbose_flag
 
             success = run_step(
-                f"4/6 - Verificar fonts ({all_languages_str})",
+                f"4/6 - Verify fonts ({all_languages_str})",
                 cmd, args.verbose
             )
             if not success:
-                print("\n[ABORT] Pipeline aturat per error al pas 4")
+                print("\n[ABORT] Pipeline stopped at step 4")
                 sys.exit(1)
         elif lang_idx == 0 and args.skip_fonts:
-            print("\n[SKIP] Passos 2-4 - Descàrrega i verificació de fonts (saltat)")
+            print("\n[SKIP] Steps 2-4 - Font download and verification (skipped)")
 
     # ============================================================
-    # PAS 5: Generar fons de paper (si no existeixen) - només una vegada
+    # STEP 5: Generate paper backgrounds (if not exist) - only once
     # ============================================================
     backgrounds_dir = Path('backgrounds')
     if not args.no_backgrounds:
@@ -341,38 +341,38 @@ Exemples:
             ] + verbose_flag
 
             success = run_step(
-                "5/6 - Generar fons de paper",
+                "5/6 - Generate paper backgrounds",
                 cmd, args.verbose
             )
             if not success:
-                print("\n[WARNING] No s'han pogut generar els fons, continuant sense fons")
+                print("\n[WARNING] Could not generate backgrounds, continuing without")
         else:
             bg_count = sum(1 for _ in backgrounds_dir.rglob('*.png'))
-            print(f"\n[OK] Pas 5 - Fons de paper ja existents ({bg_count} images)")
+            print(f"\n[OK] Step 5 - Paper backgrounds already exist ({bg_count} images)")
     else:
-        print("\n[SKIP] Pas 5 - Fons de paper (desactivats)")
+        print("\n[SKIP] Step 5 - Paper backgrounds (disabled)")
 
     # ============================================================
-    # PAS 6: Generar dataset (tots els languages junts)
+    # STEP 6: Generate dataset (all languages together)
     # ============================================================
     if not args.skip_dataset:
         output_dir = 'output'
         if args.output_name:
             output_dir = f'output_{args.output_name}'
 
-        # Sempre eliminar carpeta existent per evitar barrejar images
+        # Always delete existing folder to avoid mixing images
         if Path(output_dir).exists():
-            print(f"\n  [CLEAN] Esborrant {output_dir}/ per evitar barrejar images...")
+            print(f"\n  [CLEAN] Deleting {output_dir}/ to avoid mixing images...")
             shutil.rmtree(output_dir)
 
-        # Construir llista de directoris de dades i languages
+        # Build list of data directories and languages
         data_dirs = []
         for lang in languages:
             lang_code = lang_configs[lang]['code']
             data_dir = f"data/wikipedia_{lang_code}" if args.text_source == 'wikipedia' else "data"
             data_dirs.append(data_dir)
         
-        # Passar com a llistes separades per comes
+        # Pass as comma-separated lists
         data_dirs_str = ','.join(data_dirs)
         languages_str = ','.join(languages)
 
@@ -400,14 +400,14 @@ Exemples:
         if args.total_images:
             cmd.extend(['--total-images', str(args.total_images)])
 
-        # Equilibrar automàticament si hi ha múltiples languages
+        # Auto-balance if multiple languages
         if len(languages) > 1:
             cmd.append('--balanced')
 
         if args.output_name:
             cmd.extend(['--output-name', args.output_name])
 
-        # Fons de paper
+        # Paper backgrounds
         if args.no_backgrounds:
             cmd.extend(['--backgrounds-dir', 'none'])
         else:
@@ -416,38 +416,38 @@ Exemples:
             if args.background_type:
                 cmd.extend(['--background-type', args.background_type])
 
-        # Pertorbacions
+        # Perturbations
         if args.perturbations:
             cmd.append('--perturbations')
             cmd.extend(['--quality-distribution', args.quality_distribution])
 
         success = run_step(
-            f"6/6 - Generar dataset sintètic ({', '.join(languages)})",
+            f"6/6 - Generate synthetic dataset ({', '.join(languages)})",
             cmd, args.verbose
         )
         if not success:
-            print(f"\n[ABORT] Pipeline aturat per error al pas 6")
+            print(f"\n[ABORT] Pipeline stopped at step 6")
             sys.exit(1)
     else:
-        print("\n[SKIP] Pas 6 - Dataset generation (saltat)")
+        print("\n[SKIP] Step 6 - Dataset generation (skipped)")
 
     # ============================================================
-    # RESUM FINAL
+    # FINAL SUMMARY
     # ============================================================
     print("\n" + "=" * 60)
-    print("  PIPELINE COMPLETAT!")
+    print("  PIPELINE COMPLETED!")
     print("=" * 60)
     if len(languages) == 1:
         print(f"  Language: {languages[0]}")
-        print(f"  Textos: data/wikipedia_{lang_configs[languages[0]]['code']}/")
+        print(f"  Texts: data/wikipedia_{lang_configs[languages[0]]['code']}/")
     else:
         print(f"  Languages: {', '.join(languages)}")
         for lang in languages:
             print(f"    - {lang}: data/wikipedia_{lang_configs[lang]['code']}/")
     print(f"  Fonts: fonts/")
-    print(f"  Fons: {'desactivats' if args.no_backgrounds else 'backgrounds/'}")
+    print(f"  Backgrounds: {'disabled' if args.no_backgrounds else 'backgrounds/'}")
     if args.perturbations:
-        print(f"  Pertorbacions: {args.quality_distribution} (clean/degraded/severe)")
+        print(f"  Perturbations: {args.quality_distribution} (clean/degraded/severe)")
     output_dir = f"output_{args.output_name}" if args.output_name else "output"
     print(f"  Dataset: {output_dir}/")
     print("=" * 60)

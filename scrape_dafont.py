@@ -15,6 +15,8 @@ import argparse
 import io
 import zipfile
 from fontTools.ttLib import TTFont
+import warnings
+warnings.filterwarnings("ignore", message=".*timestamp seems very low.*")
 from pathlib import Path
 import json
 from PIL import Image, ImageDraw, ImageFont
@@ -30,13 +32,13 @@ class DaFontScraper:
         self.use_accent_filter = use_accent_filter
         self.filter_params = "&a=on" if self.use_accent_filter else ""
         
-        # Carregar configuracions d'idiomes
+        # Load language configurations
         self.language_configs = self._load_language_configs(languages)
         
         if self.verbose:
             print(f"[INFO] Languages loaded: {', '.join(self.language_configs.keys())}")
         
-        # Fonts amb problemes coneguts: logos, watermarks, glifs trencats
+        # Fonts with known issues: logos, watermarks, broken glyphs
         self.font_blacklist = [
             'Loveletter_No._9',
             'Loveletter No. 9',
@@ -45,12 +47,12 @@ class DaFontScraper:
             'MN.SG/BORGERS',
             'Xtreem',                    # Watermark "PERSONAL USE ONLY MN.SG/XTREEM"
             'MN.SG/XTREEM',
-            'Scripty',                   # Falta glif coma
+            'Scripty',                   # Missing comma glyph
             'Barethelly_Signature',      # Watermark "Din Studio"
             'Barethelly Signature',
             'Arsenale_White',            # Watermark "PERSONAL USE ONLY - ZETAFONTS.COM"
             'Arsenale White',
-            'Nowyal',                    # Glifs faltants / watermark
+            'Nowyal',                    # Missing glyphs / watermark
             'Vítkova_písanka',           # Watermark "personal use only - fonty.cendik.ca"
             'Vítkova písanka',
             'Cursif',                    # Empty glyphs for ó/ò
@@ -59,19 +61,19 @@ class DaFontScraper:
 
     def _load_language_configs(self, languages=None):
         """
-        Carrega les configuracions dels idiomes especificats.
-        Si languages és None o 'all', carrega tots els disponibles.
+        Loads configurations for specified languages.
+        If languages is None or 'all', loads all available.
         """
         configs = {}
         languages_dir = Path(__file__).parent / 'languages'
         
         if not languages_dir.exists():
-            print(f"[WARNING] languages/ directory not found: {languages_dir}")
+            print(f"[WARNING] Languages directory does not exist: {languages_dir}")
             return configs
         
         available_langs = [p.stem for p in languages_dir.glob('*.json')]
         
-        # Determinar quins idiomes carregar
+        # Determine which languages to load
         if languages is None or languages == ['all'] or 'all' in languages:
             langs_to_load = available_langs
         else:
@@ -96,39 +98,39 @@ class DaFontScraper:
         return configs
 
     def _get_base_required_chars(self):
-        """Retorna els caràcters base requerits per totes les fonts."""
+        """Returns base characters required for all fonts."""
         base_chars = set()
         # Numbers
         for cp in range(0x0030, 0x003A):  # 0-9
             base_chars.add(cp)
         # Basic punctuation and common signs
         base_chars.update([
-            0x002C,  # , (coma)
-            0x002E,  # . (punt)
+            0x002C,  # , (comma)
+            0x002E,  # . (period)
             0x002D,  # - (hyphen)
             0x0027,  # ' (apostrophe)
             0x0021,  # ! (exclamation)
-            0x003F,  # ? (question mark)
-            0x003A,  # : (dos punts)
-            0x003B,  # ; (punt i coma)
+            0x003F,  # ? (question)
+            0x003A,  # : (colon)
+            0x003B,  # ; (semicolon)
             0x0028,  # ( (left parenthesis)
             0x0029,  # ) (right parenthesis)
-            0x0022,  # " (cometes dobles)
+            0x0022,  # " (double quote)
         ])
         return base_chars
 
     def _check_for_watermark(self, font_data):
         """
-        Detecta si una font té watermark generant imatges de prova.
-        Els watermarks sovint apareixen als espais, números o puntuació.
-        Retorna (has_watermark, reason).
+        Detects if a font has watermark by generating test images.
+        Watermarks often appear in spaces, numbers or punctuation.
+        Returns (has_watermark, reason).
         """
         try:
-            # Carregar font amb PIL
+            # Load font with PIL
             font_size = 40
             pil_font = ImageFont.truetype(io.BytesIO(font_data), font_size)
             
-            # Test 1: Text amb espais (on sovint s'amaguen watermarks)
+            # Test 1: Text with spaces (where watermarks often hide)
             test_text = "A B C D E"
             img = Image.new('RGB', (600, 80), 'white')
             draw = ImageDraw.Draw(img)
@@ -141,9 +143,9 @@ class DaFontScraper:
             dark_ratio = dark_pixels / total_pixels
             
             if dark_ratio > 0.08:
-                return True, f"Test 1 (espais): massa píxels foscos ({dark_ratio:.1%})"
+                return True, f"Test 1 (spaces): too many dark pixels ({dark_ratio:.1%})"
             
-            # Test 2: Numbers (molts watermarks apareixen amb números)
+            # Test 2: Numbers (many watermarks appear with numbers)
             test_text2 = "1 2 3 4 5 6 7 8 9 0"
             img2 = Image.new('RGB', (800, 80), 'white')
             draw2 = ImageDraw.Draw(img2)
@@ -155,9 +157,9 @@ class DaFontScraper:
             dark_ratio2 = dark_pixels2 / len(pixels2)
             
             if dark_ratio2 > 0.10:
-                return True, f"Test 2 (números): massa píxels foscos ({dark_ratio2:.1%})"
+                return True, f"Test 2 (numbers): too many dark pixels ({dark_ratio2:.1%})"
             
-            # Test 3: Espais llargs (detectar watermarks repetitius)
+            # Test 3: Long spaces (detect repetitive watermarks)
             test_text3 = "A          B          C"
             img3 = Image.new('RGB', (900, 80), 'white')
             draw3 = ImageDraw.Draw(img3)
@@ -168,11 +170,11 @@ class DaFontScraper:
             dark_pixels3 = sum(1 for p in pixels3 if p < 180)
             dark_ratio3 = dark_pixels3 / len(pixels3)
             
-            # With only 3 letters and spaces, should have very few dark pixels
+            # With only 3 letters and many spaces, should have very few dark pixels
             if dark_ratio3 > 0.04:
-                return True, f"Test 3 (espais llargs): contingut als espais ({dark_ratio3:.1%})"
+                return True, f"Test 3 (long spaces): content in spaces ({dark_ratio3:.1%})"
             
-            # Test 4: Text llarg per detectar watermarks petits repetitius
+            # Test 4: Long text to detect small repetitive watermarks
             test_text4 = "Hello, World! Test 123. The quick brown fox."
             img4 = Image.new('RGB', (1200, 80), 'white')
             draw4 = ImageDraw.Draw(img4)
@@ -184,26 +186,26 @@ class DaFontScraper:
             dark_ratio4 = dark_pixels4 / len(pixels4)
             
             if dark_ratio4 > 0.12:
-                return True, f"Test 4 (text llarg): contingut extra ({dark_ratio4:.1%})"
+                return True, f"Test 4 (long text): extra content ({dark_ratio4:.1%})"
             
             return False, "OK"
             
         except Exception as e:
-            # Si no podem comprovar, assumim OK
-            return False, f"No verificat: {e}"
+            # If we can't check, assume OK
+            return False, f"Not verified: {e}"
 
     def _glyph_renders_correctly(self, font_data, char, font_size=40):
         """
-        Verifica que un caràcter es renderitza correctament (no és un glif buit).
-        Algunes fonts declaren suportar un caràcter al cmap però el glif està buit.
+        Verifies that a character renders correctly (not an empty glyph).
+        Some fonts declare support for a character in cmap but the glyph is empty.
         """
         try:
             pil_font = ImageFont.truetype(io.BytesIO(font_data), font_size)
             
             # Create small image to render character
-            img = Image.new('L', (60, 60), 255)  # Fons blanc
+            img = Image.new('L', (60, 60), 255)  # White background
             draw = ImageDraw.Draw(img)
-            draw.text((10, 10), char, font=pil_font, fill=0)  # Text negre
+            draw.text((10, 10), char, font=pil_font, fill=0)  # Black text
             
             # Count dark pixels
             dark_pixels = sum(1 for p in img.getdata() if p < 200)
@@ -334,8 +336,8 @@ class DaFontScraper:
 
     def check_language_support(self, download_url):
         """
-        Comprova quins idiomes suporta una font descarregant-la i inspeccionant-la.
-        Retorna una llista d'idiomes suportats.
+        Checks which languages a font supports by downloading and inspecting it.
+        Returns a list of supported languages.
         """
         if not download_url:
             return []
@@ -348,7 +350,7 @@ class DaFontScraper:
                 print(f"      [X] Failed to download: {e}")
             return []
 
-        # Extreure font del ZIP
+        # Extract font from ZIP
         content_type = response.headers.get('Content-Type', '')
         if 'zip' in content_type or download_url.endswith('.zip') or response.content[:2] == b'PK':
             try:
@@ -374,7 +376,7 @@ class DaFontScraper:
         else:
             font_data = response.content
 
-        # Carregar font i obtenir cmap
+        # Load font and get cmap
         try:
             font = TTFont(io.BytesIO(font_data))
             cmap = font.getBestCmap()
@@ -389,7 +391,7 @@ class DaFontScraper:
                 print(f"      [X] Failed to load font: {e}")
             return []
 
-        # First verify base chars (numbers, punctuation)
+        # First, verify base characters (numbers, punctuation)
         base_chars = self._get_base_required_chars()
         for cp in base_chars:
             if cp not in cmap:
@@ -397,14 +399,14 @@ class DaFontScraper:
                     print(f"      [X] Missing base char U+{cp:04X}")
                 return []
 
-        # Ara, comprovar cada idioma
+        # Now, check each language
         supported_languages = []
         
         for lang, config in self.language_configs.items():
             required_chars = config['required_chars']
             
             if not required_chars:
-                # Language without special characters (ex: anglès)
+                # Language without special characters (e.g. English)
                 supported_languages.append(lang)
                 continue
             
@@ -434,13 +436,13 @@ class DaFontScraper:
                     if empty_glyphs:
                         print(f"      [X] {lang}: empty glyphs {', '.join(empty_glyphs[:5])}{'...' if len(empty_glyphs) > 5 else ''}")
 
-        # Si la font suporta algun idioma, comprovar watermarks
+        # If font supports any language, check watermarks
         if supported_languages:
             has_watermark, reason = self._check_for_watermark(font_data)
             if has_watermark:
                 if self.verbose:
                     print(f"      [WATERMARK] {reason}")
-                return []  # Descartar font
+                return []  # Discard font
 
         return supported_languages
 
@@ -472,8 +474,8 @@ class DaFontScraper:
 def main():
     parser = argparse.ArgumentParser(description='Scrape DaFont for language-compatible fonts')
     parser.add_argument('--language', default='all',
-                        help='Idiomes a comprovar, separats per comes (default: all). '
-                             'Ex: --language catalan,spanish,romanian o --language all')
+                        help='Languages to check, comma-separated (default: all). '
+                             'Ex: --language catalan,spanish,romanian or --language all')
     parser.add_argument('--categories', type=int, default=3, help='Number of categories to scrape')
     parser.add_argument('--category-filter', type=str, default=None,
                         help='Filter by category name(s), comma-separated (e.g., "Handwritten,Script,Brush")')
@@ -484,11 +486,11 @@ def main():
     parser.add_argument('--verbose', '-v', action='store_true',
                         help='Show detailed character detection information')
     parser.add_argument('--min-languages', type=int, default=1,
-                        help='Mínim d\'idiomes que ha de suportar una font per ser inclosa (default: 1)')
+                        help='Minimum languages a font must support to be included (default: 1)')
 
     args = parser.parse_args()
 
-    # Parsejar idiomes
+    # Parse languages
     if args.language.lower() == 'all':
         languages = ['all']
     else:
@@ -501,8 +503,8 @@ def main():
     )
 
     print(f"Starting DaFont scraper...")
-    print(f"  Idiomes a comprovar: {', '.join(scraper.language_configs.keys())}")
-    print(f"  Mínim idiomes per font: {args.min_languages}")
+    print(f"  Languages to check: {', '.join(scraper.language_configs.keys())}")
+    print(f"  Minimum languages per font: {args.min_languages}")
     print("=" * 60)
     
     if scraper.use_accent_filter:
@@ -536,13 +538,13 @@ def main():
         all_fonts.extend(fonts)
         time.sleep(2)
 
-    # Filtrar fonts que suporten mínim N idiomes
+    # Filter fonts that support at least N languages
     compatible_fonts = [
         f for f in all_fonts 
         if len(f.get('supported_languages', [])) >= args.min_languages
     ]
 
-    # Estadístiques per idioma
+    # Statistics per language
     lang_stats = {}
     for lang in scraper.language_configs.keys():
         count = sum(1 for f in compatible_fonts if lang in f.get('supported_languages', []))
@@ -550,20 +552,20 @@ def main():
 
     # Results
     print("\n" + "=" * 60)
-    print(f"RESULTATS:")
-    print(f"  Total fonts escanejades: {len(all_fonts)}")
-    print(f"  Fonts compatibles (≥{args.min_languages} idioma): {len(compatible_fonts)}")
+    print(f"RESULTS:")
+    print(f"  Total fonts scanned: {len(all_fonts)}")
+    print(f"  Compatible fonts (≥{args.min_languages} language): {len(compatible_fonts)}")
     
-    print(f"\n  Fonts per idioma:")
+    print(f"\n  Fonts per language:")
     for lang, count in sorted(lang_stats.items(), key=lambda x: -x[1]):
         print(f"    {lang}: {count}")
 
     if compatible_fonts:
-        print(f"\nPrimeres 10 fonts compatibles:")
+        print(f"\nFirst 10 compatible fonts:")
         for font in compatible_fonts[:10]:
             langs = ', '.join(font.get('supported_languages', []))
             print(f"  • {font['name']}")
-            print(f"    Idiomes: {langs}")
+            print(f"    Languages: {langs}")
 
     scraper.save_results(compatible_fonts, args.output)
 
