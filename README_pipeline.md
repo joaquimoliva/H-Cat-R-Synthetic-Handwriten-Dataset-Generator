@@ -126,7 +126,7 @@ Text samples are natural sentences extracted from Wikipedia articles, filtered t
 | `--max-texts` | All available | Limit texts per language. Use low values (5-10) to prioritize font variety |
 | `--max-fonts-per-category` | All available | Limit fonts per category. Use low values (10-20) to prioritize text variety |
 | `--mode` | `lines` | Generation mode: `lines` (sentences), `words` (individual words), or `lines,words` for both |
-| `--mode-distribution` | `50,50` | Distribution when using mixed modes (e.g., `70,30` for 70% lines, 30% words) |
+| `--mode-distribution` | `50,50` | Distribution of **images** when using mixed modes (e.g., `70,30` for 70% lines images, 30% words images) |
 
 **Tip:** Always set `--total-images` or limit texts/fonts to avoid generating unexpectedly large datasets.
 
@@ -141,9 +141,11 @@ python run_pipeline.py --language catalan --mode words --total-images 1000
 # Mixed: 50% lines, 50% words (default distribution)
 python run_pipeline.py --language catalan --mode lines,words --total-images 1000
 
-# Mixed: 70% lines, 30% words
+# Mixed: 70% lines, 30% words (applied to IMAGES, not texts)
 python run_pipeline.py --language catalan --mode lines,words --mode-distribution 70,30 --total-images 1000
 ```
+
+**Note:** The `--mode-distribution` applies to the final **images**, not to texts. The system automatically calculates how many texts to assign to each mode to achieve the desired image distribution.
 
 #### Background Parameters
 
@@ -221,3 +223,53 @@ Each generated image includes metadata in `metadata.jsonl`:
 | `mode` | `lines` (full sentence) or `words` (single word) |
 | `quality` | `clean`, `degraded`, or `severe` |
 | `perturbations` | Applied perturbations (only present if quality ≠ clean) |
+
+### Dataset Verification
+
+Use `verify_dataset.py` to validate generated datasets:
+
+```bash
+# Verify a specific dataset
+python verify_dataset.py output_my_dataset
+
+# Default: verifies output/
+python verify_dataset.py
+```
+
+**Checks performed:**
+- ✅ Rectangle glyphs (placeholder characters from problematic fonts)
+- ✅ Metadata integrity (`char_count`, `word_count` correctness)
+- ✅ Mode distribution (lines vs words percentages)
+- ✅ Quality distribution (clean/degraded/severe)
+- ✅ Multilingual support (languages detected)
+- ✅ Special characters per language
+
+**Example output:**
+```
+📂 Verificant: output_test/
+======================================================================
+📊 VERIFICACIÓ DATASET MULTILINGÜE
+======================================================================
+📈 ESTADÍSTIQUES GENERALS
+   Total imatges: 1,333
+   Fonts úniques: 36
+🌍 IDIOMES
+   catalan: 1,333 imatges (100.0%), 36 fonts
+📝 MODES
+   lines: 981 (73.6%)
+   words: 352 (26.4%)
+🎨 QUALITAT
+   clean: 558 (41.9%)
+   degraded: 520 (39.0%)
+   severe: 255 (19.1%)
+======================================================================
+🧪 TESTS
+======================================================================
+✅ TEST RECTANGLES: PASSAT
+✅ TEST METADATA: PASSAT
+✅ TEST MODES: PASSAT
+✅ TEST MULTILINGÜE: PASSAT
+======================================================================
+🎉 TOTS ELS TESTS CRÍTICS PASSATS!
+======================================================================
+```

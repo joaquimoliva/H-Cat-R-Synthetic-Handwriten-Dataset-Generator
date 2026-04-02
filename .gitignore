@@ -15,3 +15,4 @@ backgrounds/
 "test_font.py" 
 "test_rectangle_filter.py" 
 "analyze_glyphs.py" 
+-e "analyze_glyphs.py\ntest_font.py\ntest_modes.py\ntest_rectangle_filter.py" 
