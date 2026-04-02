@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-Genera un catàleg visual de totes les fonts disponibles.
-Permet inspeccionar ràpidament quines fonts semblen manuscrites reals.
-Ús: python preview_fonts.py --category Handwritten -v
+Generate a visual catalog of all available fonts.
+Allows quick inspection of which fonts look like real handwriting.
+Usage: python preview_fonts.py --category Handwritten -v
 """
 
 import os
@@ -14,14 +14,14 @@ import math
 
 def generate_font_preview(fonts_dir='fonts', output_file='font_preview.png',
                           category_filter=None, sample_text=None, verbose=False):
-    """Genera una imatge amb la previsualització de totes les fonts"""
+    """Generate an image with preview of all fonts"""
 
     fonts_dir = Path(fonts_dir)
 
     if sample_text is None:
         sample_text = "El vent satisfà la gent 0123"
 
-    # Recollir totes les fonts
+    # Collect all fonts
     fonts = []
     for root, dirs, files in os.walk(fonts_dir):
         for file in files:
@@ -30,17 +30,17 @@ def generate_font_preview(fonts_dir='fonts', output_file='font_preview.png',
                 rel_path = font_path.relative_to(fonts_dir)
                 parts = rel_path.parts
 
-                # Obtenir categoria
+                # Get category
                 category = parts[0] if len(parts) > 1 else 'Unknown'
 
-                # Aplicar filtre de categoria
+                # Apply category filter
                 if category_filter and category.lower() != category_filter.lower():
                     continue
 
-                # Obtenir nom de la font
+                # Get font name
                 font_name = parts[1] if len(parts) > 1 else parts[0]
 
-                # Evitar duplicats (agafar només la primera variant)
+                # Avoid duplicates (take only first variant)
                 font_key = f"{category}/{font_name}"
 
                 fonts.append({
@@ -50,7 +50,7 @@ def generate_font_preview(fonts_dir='fonts', output_file='font_preview.png',
                     'key': font_key
                 })
 
-    # Eliminar duplicats per carpeta de font
+    # Remove duplicates by font folder
     seen = set()
     unique_fonts = []
     for f in fonts:
@@ -60,23 +60,23 @@ def generate_font_preview(fonts_dir='fonts', output_file='font_preview.png',
     fonts = sorted(unique_fonts, key=lambda x: (x['category'], x['name']))
 
     if not fonts:
-        print("[ERROR] No s'han trobat fonts")
+        print("[ERROR] No fonts found")
         return
 
-    print(f"[INFO] {len(fonts)} fonts trobades")
+    print(f"[INFO] {len(fonts)} fonts found")
 
-    # Configuració de la imatge
+    # Image configuration
     row_height = 80
     label_width = 300
     sample_width = 800
     img_width = label_width + sample_width
     img_height = row_height * len(fonts) + 40  # +40 per al títol
 
-    # Crear imatge
+    # Create image
     img = Image.new('RGB', (img_width, img_height), 'white')
     draw = ImageDraw.Draw(img)
 
-    # Títol
+    # Title
     try:
         title_font = ImageFont.truetype("arial.ttf", 20)
         label_font = ImageFont.truetype("arial.ttf", 14)
@@ -88,31 +88,31 @@ def generate_font_preview(fonts_dir='fonts', output_file='font_preview.png',
             title_font = ImageFont.load_default()
             label_font = ImageFont.load_default()
 
-    title = f"Catàleg de fonts"
+    title = f"Font Catalog"
     if category_filter:
-        title += f" - Categoria: {category_filter}"
+        title += f" - Category: {category_filter}"
     title += f" ({len(fonts)} fonts)"
     draw.text((10, 10), title, font=title_font, fill='black')
 
-    # Renderitzar cada font
+    # Render each font
     y_pos = 40
     for idx, font_info in enumerate(fonts):
-        # Fons alternat
+        # Alternating background
         if idx % 2 == 0:
             draw.rectangle([(0, y_pos), (img_width, y_pos + row_height)], fill='#F8F8F8')
 
-        # Número i nom de la font
+        # Number and font name
         label = f"{idx+1:3d}. [{font_info['category']}] {font_info['name']}"
         draw.text((10, y_pos + 5), label, font=label_font, fill='#333333')
 
-        # Renderitzar text de mostra
+        # Render sample text
         try:
-            # Provar amb mida 36
+            # Try with size 36
             sample_font = ImageFont.truetype(str(font_info['path']), 36)
             bbox = draw.textbbox((0, 0), sample_text, font=sample_font)
             text_height = bbox[3] - bbox[1]
 
-            # Ajustar si és massa gran
+            # Adjust if too large
             if text_height > row_height * 0.7:
                 scale = (row_height * 0.6) / text_height
                 sample_font = ImageFont.truetype(str(font_info['path']), int(36 * scale))
@@ -129,34 +129,34 @@ def generate_font_preview(fonts_dir='fonts', output_file='font_preview.png',
             if verbose:
                 print(f"  [ERROR] {font_info['name']}: {e}")
 
-        # Línia separadora
+        # Separator line
         draw.line([(0, y_pos + row_height), (img_width, y_pos + row_height)], fill='#DDDDDD')
 
         y_pos += row_height
 
-    # Guardar
+    # Save
     img.save(output_file)
-    print(f"\n[SUCCESS] Catàleg guardat a: {output_file}")
-    print(f"  Mida: {img_width}x{img_height} píxels")
-    print(f"  Fonts mostrades: {len(fonts)}")
-    print(f"\nObre la imatge i marca les fonts que NO vulguis usar.")
-    print(f"Després pots eliminar les carpetes corresponents de fonts/")
+    print(f"\n[SUCCESS] Catalog saved to: {output_file}")
+    print(f"  Size: {img_width}x{img_height} pixels")
+    print(f"  Fonts shown: {len(fonts)}")
+    print(f"\nOpen the image and mark fonts you do NOT want to use.")
+    print(f"Then you can delete the corresponding folders from fonts/")
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description='Genera un catàleg visual de les fonts disponibles'
+        description='Generate a visual catalog of available fonts'
     )
     parser.add_argument('--fonts-dir', default='fonts',
-                        help='Directori de fonts (default: fonts)')
+                        help='Fonts directory (default: fonts)')
     parser.add_argument('--output', '-o', default='font_preview.png',
-                        help='Fitxer de sortida (default: font_preview.png)')
+                        help='Output file (default: font_preview.png)')
     parser.add_argument('--category-filter', default=None,
-                        help='Filtrar per categoria (ex: Handwritten, Script, Brush)')
+                        help='Filter by category (ex: Handwritten, Script, Brush)')
     parser.add_argument('--sample-text', default=None,
-                        help='Text de mostra personalitzat')
+                        help='Custom sample text')
     parser.add_argument('--verbose', '-v', action='store_true',
-                        help='Mostrar informació detallada')
+                        help='Show detailed information')
 
     args = parser.parse_args()
 
