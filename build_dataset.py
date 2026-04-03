@@ -879,6 +879,9 @@ class SyntheticDatasetBuilder:
                 images_per_lang = total_images // num_languages
                 MIN_TEXTS_PER_LANG = 5  # Minimum texts for linguistic variety
                 
+                # Store limit for use during generation
+                self.images_per_lang_limit = {lang: images_per_lang for lang in self.fonts_by_lang}
+                
                 print(f"  [INFO] Target: {total_images} images ({images_per_lang}/language)")
                 print(f"  [DYNAMIC CALCULATION PER LANGUAGE]")
                 
@@ -1111,6 +1114,9 @@ class SyntheticDatasetBuilder:
         tasks = []
         counters = {'train': 0, 'validation': 0, 'test': 0}
         
+        # Image counters per language for balanced generation
+        lang_image_counts = {lang: 0 for lang in self.languages} if hasattr(self, 'languages') else {}
+        
         # Perturbation config to pass to workers
         perturbation_config = {
             'enabled': self.perturbations_enabled,
@@ -1125,6 +1131,11 @@ class SyntheticDatasetBuilder:
             for text_data in split_texts:
                 text = text_data['text']
                 text_lang = text_data.get('language', self.languages[0] if self.languages else 'unknown')
+                
+                # Check if this language has reached its image limit
+                if hasattr(self, 'images_per_lang_limit') and text_lang in self.images_per_lang_limit:
+                    if lang_image_counts.get(text_lang, 0) >= self.images_per_lang_limit[text_lang]:
+                        continue  # Skip this text, language quota reached
                 
                 # Get compatible fonts for this language
                 if text_lang in self.fonts_by_lang:
@@ -1149,6 +1160,19 @@ class SyntheticDatasetBuilder:
                     words_to_render = words
                 else:
                     words_to_render = [text]
+
+                # Calculate images this text will generate
+                images_for_this_text = len(words_to_render) * len(compatible_fonts)
+                
+                # Check if adding this text would exceed limit
+                if hasattr(self, 'images_per_lang_limit') and text_lang in self.images_per_lang_limit:
+                    current_count = lang_image_counts.get(text_lang, 0)
+                    limit = self.images_per_lang_limit[text_lang]
+                    if current_count + images_for_this_text > limit * 1.1:  # 10% tolerance
+                        continue  # Skip this text
+                
+                # Update language image counter
+                lang_image_counts[text_lang] = lang_image_counts.get(text_lang, 0) + images_for_this_text
 
                 for text_to_render in words_to_render:
                     for font_info in compatible_fonts:
@@ -1249,6 +1273,9 @@ class SyntheticDatasetBuilder:
         global_train_count = 0
         global_val_count = 0
         global_test_count = 0
+        
+        # Image counters per language for balanced generation
+        lang_image_counts = {lang: 0 for lang in self.languages} if hasattr(self, 'languages') else {}
 
         with tqdm(total=total_items, desc="Generating images", unit="img") as pbar:
             for split_name, split_texts, split_dir, split_metadata in [
@@ -1259,6 +1286,11 @@ class SyntheticDatasetBuilder:
                 for text_data in split_texts:
                     text = text_data['text']
                     text_lang = text_data.get('language', self.languages[0] if self.languages else 'unknown')
+                    
+                    # Check if this language has reached its image limit
+                    if hasattr(self, 'images_per_lang_limit') and text_lang in self.images_per_lang_limit:
+                        if lang_image_counts.get(text_lang, 0) >= self.images_per_lang_limit[text_lang]:
+                            continue  # Skip this text, language quota reached
                     
                     # Get compatible fonts for this language
                     if text_lang in self.fonts_by_lang:
@@ -1283,6 +1315,19 @@ class SyntheticDatasetBuilder:
                         words_to_render = words
                     else:
                         words_to_render = [text]
+
+                    # Calculate images this text will generate
+                    images_for_this_text = len(words_to_render) * len(compatible_fonts)
+                    
+                    # Check if adding this text would exceed limit
+                    if hasattr(self, 'images_per_lang_limit') and text_lang in self.images_per_lang_limit:
+                        current_count = lang_image_counts.get(text_lang, 0)
+                        limit = self.images_per_lang_limit[text_lang]
+                        if current_count + images_for_this_text > limit * 1.1:  # 10% tolerance
+                            continue  # Skip this text
+                    
+                    # Update language image counter
+                    lang_image_counts[text_lang] = lang_image_counts.get(text_lang, 0) + images_for_this_text
 
                     for text_to_render in words_to_render:
                         for font_info in compatible_fonts:
@@ -1608,7 +1653,7 @@ def main():
     builder.generate_dataset(
         max_texts=args.max_texts,
         total_images=args.total_images,
-        balanced=args.balanced,
+        balanced=args.balanced or len(builder.languages) > 1,
         target_height=args.font_size
     )
 
