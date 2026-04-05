@@ -57,6 +57,9 @@ class DaFontScraper:
             'Vítkova písanka',
             'Cursif',                    # Empty glyphs for ó/ò
             'Ecolier',                   # Empty glyphs for ó/ò
+            'Vintage_Signature',         # Watermark "Din Studio"
+            'Vintage Signature',
+            'Din Studio'
         ]
 
     def _load_language_configs(self, languages=None):
@@ -188,6 +191,26 @@ class DaFontScraper:
             if dark_ratio4 > 0.12:
                 return True, f"Test 4 (long text): extra content ({dark_ratio4:.1%})"
             
+            # Test 5: Detect content AFTER the text (watermarks often at right margin)
+            test_text5 = "Test"
+            img5 = Image.new('RGB', (800, 80), 'white')
+            draw5 = ImageDraw.Draw(img5)
+            draw5.text((10, 15), test_text5, font=pil_font, fill='black')
+        
+            # Get text bounding box
+            bbox = pil_font.getbbox(test_text5)
+            text_end_x = 10 + bbox[2] + 50  # Text end + small margin
+        
+            # Check region AFTER the text (where watermarks hide)
+            gray5 = img5.convert('L')
+            width, height = img5.size
+            right_region = gray5.crop((text_end_x, 0, width, height))
+            pixels5 = list(right_region.getdata())
+            dark_pixels5 = sum(1 for p in pixels5 if p < 200)
+        
+            if dark_pixels5 > 10:  # Should be pure white
+                return True, f"Test 5 (right margin): content after text ({dark_pixels5} dark pixels)"
+
             return False, "OK"
             
         except Exception as e:
