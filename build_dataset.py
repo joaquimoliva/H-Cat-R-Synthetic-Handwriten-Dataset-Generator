@@ -337,7 +337,7 @@ class SyntheticDatasetBuilder:
                  category_filter=None, backgrounds_dir=None,
                  background_color=None, background_type=None,
                  perturbations=False, quality_distribution=(40, 40, 20),
-                 language='unknown'):
+                 language='unknown', unique_texts=False):
         # Store data_dir as string (may contain multiple directories comma-separated)
         self.data_dir = data_dir
         self.fonts_dir = Path(fonts_dir)
@@ -368,6 +368,7 @@ class SyntheticDatasetBuilder:
         self.background_color = background_color
         self.background_type = background_type
         self.language = language
+        self.unique_texts = unique_texts
         
         # Parse languages
         if ',' in language:
@@ -924,10 +925,13 @@ class SyntheticDatasetBuilder:
                 max_texts = None
             else:
                 # Single language or not balanced
-                max_texts = total_images // min_fonts_per_lang
+                if self.unique_texts:
+                    max_texts = total_images  # 1 text = 1 image with unique_texts
+                else:
+                    max_texts = total_images // min_fonts_per_lang
                 if max_texts < 1:
                     max_texts = 1
-                print(f"  [INFO] total_images={total_images} → max_texts={max_texts} (with {min_fonts_per_lang} fonts)")
+                print(f"  [INFO] total_images={total_images} → max_texts={max_texts} (unique_texts={self.unique_texts})")
         
         # Balanced sampling by language
         if balanced and num_languages > 1:
@@ -1162,7 +1166,10 @@ class SyntheticDatasetBuilder:
                     words_to_render = [text]
 
                 # Calculate images this text will generate
-                images_for_this_text = len(words_to_render) * len(compatible_fonts)
+                if self.unique_texts:
+                    images_for_this_text = len(words_to_render)  # 1 font per text
+                else:
+                    images_for_this_text = len(words_to_render) * len(compatible_fonts)
                 
                 # Check if adding this text would exceed limit
                 if hasattr(self, 'images_per_lang_limit') and text_lang in self.images_per_lang_limit:
@@ -1175,7 +1182,13 @@ class SyntheticDatasetBuilder:
                 lang_image_counts[text_lang] = lang_image_counts.get(text_lang, 0) + images_for_this_text
 
                 for text_to_render in words_to_render:
-                    for font_info in compatible_fonts:
+                    # Si unique_texts, només una font aleatòria per text
+                    if self.unique_texts:
+                        fonts_to_use = [random.choice(compatible_fonts)]
+                    else:
+                        fonts_to_use = compatible_fonts
+                    
+                    for font_info in fonts_to_use:
                         img_filename = f"{counters[split_name]:08d}.png"
                         counters[split_name] += 1
 
@@ -1317,7 +1330,10 @@ class SyntheticDatasetBuilder:
                         words_to_render = [text]
 
                     # Calculate images this text will generate
-                    images_for_this_text = len(words_to_render) * len(compatible_fonts)
+                    if self.unique_texts:
+                        images_for_this_text = len(words_to_render)  # 1 font per text
+                    else:
+                        images_for_this_text = len(words_to_render) * len(compatible_fonts)
                     
                     # Check if adding this text would exceed limit
                     if hasattr(self, 'images_per_lang_limit') and text_lang in self.images_per_lang_limit:
@@ -1330,7 +1346,13 @@ class SyntheticDatasetBuilder:
                     lang_image_counts[text_lang] = lang_image_counts.get(text_lang, 0) + images_for_this_text
 
                     for text_to_render in words_to_render:
-                        for font_info in compatible_fonts:
+                        # Si unique_texts, només una font aleatòria per text
+                        if self.unique_texts:
+                            fonts_to_use = [random.choice(compatible_fonts)]
+                        else:
+                            fonts_to_use = compatible_fonts
+                        
+                        for font_info in fonts_to_use:
                             img_result = self.generate_image(text_to_render, font_info, target_height)
 
                             if img_result[0] is None:
@@ -1482,6 +1504,8 @@ class SyntheticDatasetBuilder:
             print(f"Mode: {', '.join(self.modes)} (distribution: {mode_dist_str})")
         else:
             print(f"Mode: {self.modes[0]}")
+        if self.unique_texts:
+            print(f"Text variety: UNIQUE (1 font per text, maximized text diversity)")
         print(f"Style: {self.style}")
         print(f"\nFonts:")
         print(f"  With bold: {self.stats['fonts_with_bold']}")
@@ -1584,6 +1608,10 @@ def main():
     parser.add_argument('--quality-distribution', type=str, default='40,40,20',
                         help='Quality distribution: clean,degraded,severe in percentages (default: 40,40,20)')
     
+    # Text variety
+    parser.add_argument('--unique-texts', action='store_true',
+                        help='Each text uses only one random font (maximizes text variety, recommended for HTR)')
+    
     parser.add_argument('--verbose', '-v', action='store_true',
                         help='Show detailed information')
 
@@ -1644,6 +1672,7 @@ def main():
         perturbations=args.perturbations,
         quality_distribution=quality_dist,
         language=args.language,
+        unique_texts=args.unique_texts,
         verbose=args.verbose
     )
 

@@ -9,6 +9,7 @@ A Python framework for generating synthetic multilingual handwritten text datase
 - **Realistic perturbations:** Blur, rotation, noise, contrast/brightness variations
 - **Multiple generation modes:** Full sentences (`lines`) or individual words (`words`)
 - **Paper backgrounds:** Grid, lined, and plain textures in multiple colors
+- **Unique texts mode:** Maximize text diversity for HTR training (1 font per text)
 - **HuggingFace-compatible output:** Ready for ML training pipelines
 
 ## Requirements
@@ -31,6 +32,10 @@ python run_pipeline.py --language catalan,polish,romanian \
 python run_pipeline.py --language spanish \
     --mode lines,words --mode-distribution 70,30 \
     --total-images 2000 --perturbations -v
+
+# Maximized text diversity (recommended for HTR training)
+python run_pipeline.py --language french \
+    --total-images 5000 --unique-texts --perturbations -v
 ```
 
 ## Pipeline Steps
@@ -172,10 +177,29 @@ The framework supports **35 languages** with Latin script. Each language has a c
 | `--max-fonts-per-category` | All | Limit fonts per category |
 | `--mode` | `lines` | Mode: `lines`, `words`, or `lines,words` |
 | `--mode-distribution` | `50,50` | Image distribution for mixed modes (e.g., `70,30`) |
+| `--unique-texts` | Off | Each text uses only one random font (maximizes text diversity) |
 
 **Note:** `--mode-distribution` applies to **images**, not texts. The system calculates optimal text-to-mode assignment automatically.
 
 > ⚠️ **Minimum dataset size:** The `--mode-distribution` parameter works accurately for datasets of **2,000+ images**. For smaller datasets, the granularity of image generation may prevent achieving the exact target distribution. This occurs because selecting 'words' mode for a single text generates approximately 10× more images than 'lines' mode (one image per word × number of fonts vs. one image per sentence × number of fonts).
+
+### Unique Texts Mode
+
+The `--unique-texts` flag changes how fonts are assigned to texts:
+
+| Mode | Behavior | Text Diversity |
+|------|----------|----------------|
+| **Default** | Each text × all compatible fonts | Low (~1-5%) |
+| **`--unique-texts`** | Each text × 1 random font | High (~100%) |
+
+**When to use `--unique-texts`:**
+- ✅ **HTR training:** Maximizes vocabulary and character sequence diversity
+- ✅ **Fine-tuning:** Better generalization to unseen text patterns
+- ✅ **Low-resource scenarios:** More effective use of limited training data
+
+**When NOT to use:**
+- ❌ **Font style learning:** When you need many examples of each font
+- ❌ **Writer identification:** When font/style consistency matters
 
 ### Background Parameters
 
@@ -220,6 +244,12 @@ python run_pipeline.py --language english \
 python run_pipeline.py --language catalan \
     --skip-text --skip-fonts \
     --total-images 1000 --perturbations -v
+
+# HTR-optimized dataset with maximum text diversity
+python run_pipeline.py --language german \
+    --total-images 10000 --unique-texts \
+    --perturbations --quality-distribution 30,50,20 \
+    --output-name german_htr -v
 ```
 
 ---

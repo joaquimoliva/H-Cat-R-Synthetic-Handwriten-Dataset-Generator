@@ -142,6 +142,8 @@ Examples:
                         help='Parallel workers, -1 for all cores (default: -1)')
     parser.add_argument('--output-name', type=str, default=None,
                         help='Custom name for output folder')
+    parser.add_argument('--unique-texts', action='store_true',
+                        help='Each text uses only one random font (maximizes text variety, recommended for HTR)')
 
     args = parser.parse_args()
 
@@ -420,6 +422,10 @@ Examples:
         if args.perturbations:
             cmd.append('--perturbations')
             cmd.extend(['--quality-distribution', args.quality_distribution])
+
+        # Unique texts (1 font per text)
+        if args.unique_texts:
+            cmd.append('--unique-texts')
 
         success = run_step(
             f"6/6 - Generate synthetic dataset ({', '.join(languages)})",
