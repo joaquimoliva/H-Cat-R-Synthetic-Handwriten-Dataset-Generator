@@ -309,6 +309,36 @@ def _load_required_chars_for_languages(languages_str):
     return required_chars
 
 
+def _get_allowed_chars_for_language(lang):
+    """
+    Returns all allowed characters for a specific language.
+    Includes: base ASCII + digits + punctuation + language-specific chars + whitespace
+    """
+    # Base characters
+    allowed = set('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789')
+    allowed.update(' .,;:!?\'"-()[]{}')
+    
+    # Load language-specific characters
+    lang_file = Path('languages') / f'{lang}.json'
+    if lang_file.exists():
+        try:
+            with open(lang_file, 'r', encoding='utf-8') as f:
+                config = json.load(f)
+                lang_chars = config.get('required_chars', [])
+                allowed.update(lang_chars)
+        except Exception:
+            pass
+    
+    return allowed
+
+
+def _text_is_valid_for_language(text, allowed_chars):
+    """
+    Checks if all characters in text are in the allowed set.
+    """
+    return all(c in allowed_chars for c in text)
+
+
 def _font_supports_chars(font_path, required_chars):
     """
     Verifies if a font supports all required characters.
@@ -700,10 +730,18 @@ class SyntheticDatasetBuilder:
             print(f"  [WARNING] Number of languages ({len(languages)}) != directories ({len(data_dirs)})")
             languages = languages[:len(data_dirs)] if len(languages) > len(data_dirs) else languages + [languages[-1]] * (len(data_dirs) - len(languages))
         
+        # Pre-load allowed characters for each language
+        allowed_chars_cache = {}
+        for lang in set(languages):
+            allowed_chars_cache[lang] = _get_allowed_chars_for_language(lang)
+        
         for data_dir, lang in zip(data_dirs, languages):
             if not data_dir.exists():
                 print(f"  [WARNING] Directory does not exist: {data_dir}")
                 continue
+            
+            # Get allowed chars for this language
+            allowed_chars = allowed_chars_cache.get(lang, set())
                 
             txt_sources = []
             for txt_file in data_dir.glob('*.txt'):
@@ -715,6 +753,7 @@ class SyntheticDatasetBuilder:
                     txt_sources.append((txt_file, book_dir.name))
             
             texts_loaded = 0
+            texts_filtered = 0
             for txt_file, book_name in txt_sources:
                 try:
                     with open(txt_file, 'r', encoding='utf-8') as f:
@@ -726,6 +765,10 @@ class SyntheticDatasetBuilder:
                         sentence = sentence.strip()
                         words = sentence.split()
                         if 3 <= len(words) <= 15 and any(c.isalpha() for c in sentence):
+                            # Filter texts with invalid characters
+                            if allowed_chars and not _text_is_valid_for_language(sentence, allowed_chars):
+                                texts_filtered += 1
+                                continue
                             self.texts.append({
                                 'text': sentence,
                                 'book': book_name,
@@ -739,6 +782,10 @@ class SyntheticDatasetBuilder:
                                 part = part.strip()
                                 part_words = part.split()
                                 if 3 <= len(part_words) <= 15 and any(c.isalpha() for c in part):
+                                    # Filter texts with invalid characters
+                                    if allowed_chars and not _text_is_valid_for_language(part, allowed_chars):
+                                        texts_filtered += 1
+                                        continue
                                     self.texts.append({
                                         'text': part,
                                         'book': book_name,
@@ -750,7 +797,10 @@ class SyntheticDatasetBuilder:
                     if self.verbose:
                         print(f"  [ERROR] Error reading {txt_file}: {e}")
             
-            print(f"  [OK] {lang}: {texts_loaded} sentences loaded from {data_dir}")
+            if texts_filtered > 0:
+                print(f"  [OK] {lang}: {texts_loaded} sentences loaded, {texts_filtered} filtered (invalid chars)")
+            else:
+                print(f"  [OK] {lang}: {texts_loaded} sentences loaded from {data_dir}")
         
         print(f"  [OK] Total: {len(self.texts)} sentences loaded")
 

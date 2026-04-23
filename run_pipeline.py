@@ -161,9 +161,15 @@ Examples:
         images_per_lang = args.total_images // len(languages)
         # Minimum 3 texts per language for proper split
         MIN_TEXTS_PER_LANG = 3
-        max_fonts_for_texts = images_per_lang // MIN_TEXTS_PER_LANG
-        fonts_to_use = min(estimated_fonts, max_fonts_for_texts) if max_fonts_for_texts > 0 else estimated_fonts
-        texts_per_lang = max(MIN_TEXTS_PER_LANG, images_per_lang // fonts_to_use)
+        
+        # With --unique-texts, each text = 1 image
+        # Without --unique-texts, each text = fonts_to_use images
+        if args.unique_texts:
+            texts_per_lang = images_per_lang  # 1 text = 1 image
+        else:
+            max_fonts_for_texts = images_per_lang // MIN_TEXTS_PER_LANG
+            fonts_to_use = min(estimated_fonts, max_fonts_for_texts) if max_fonts_for_texts > 0 else estimated_fonts
+            texts_per_lang = max(MIN_TEXTS_PER_LANG, images_per_lang // fonts_to_use)
         
         # Estimate needed articles (approx 30 useful sentences per article, x2 margin)
         SENTENCES_PER_ARTICLE = 30
@@ -358,9 +364,10 @@ Examples:
     # STEP 6: Generate dataset (all languages together)
     # ============================================================
     if not args.skip_dataset:
-        output_dir = 'output'
         if args.output_name:
-            output_dir = f'output_{args.output_name}'
+            output_dir = args.output_name if args.output_name.startswith('output') else f'output_{args.output_name}'
+        else:
+            output_dir = 'output'
 
         # Always delete existing folder to avoid mixing images
         if Path(output_dir).exists():
